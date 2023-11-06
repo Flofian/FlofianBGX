@@ -2,6 +2,7 @@
 #include "sona.h"
 
 namespace sona {
+	#define P_DRAW_COLOR (MAKE_COLOR ( 255, 255, 255, 100 )) 
 	#define Q_DRAW_COLOR (MAKE_COLOR ( 0, 0, 255, 255 )) 
 	#define W_DRAW_COLOR (MAKE_COLOR ( 0, 255, 0, 255 )) 
 	#define E_DRAW_COLOR (MAKE_COLOR ( 0, 255, 255, 255 )) 
@@ -38,6 +39,7 @@ namespace sona {
 		TreeEntry* draw_range_p = nullptr;
 		TreeEntry* draw_range_q = nullptr;
 		TreeEntry* draw_range_w = nullptr;
+		TreeEntry* draw_range_e = nullptr;
 		TreeEntry* draw_range_r = nullptr;
 	}
 
@@ -55,10 +57,14 @@ namespace sona {
 			return;
 		}
 
+		if (drawMenu::draw_range_p->get_bool())
+			draw_manager->add_circle(myhero->get_position(), passiveMenu::auraRange->get_int(), P_DRAW_COLOR);
 		if (q->is_ready() && drawMenu::draw_range_q->get_bool())
 			draw_manager->add_circle(myhero->get_position(), q->range(), Q_DRAW_COLOR);
 		if (w->is_ready() && drawMenu::draw_range_w->get_bool())
 			draw_manager->add_circle(myhero->get_position(), w->range(), W_DRAW_COLOR);
+		if (e->is_ready() && drawMenu::draw_range_e->get_bool())
+			draw_manager->add_circle(myhero->get_position(), passiveMenu::auraRange->get_int(), E_DRAW_COLOR);
 		if (r->is_ready() && drawMenu::draw_range_r->get_bool())
 			draw_manager->add_circle(myhero->get_position(), r->range(), R_DRAW_COLOR);
 	}
