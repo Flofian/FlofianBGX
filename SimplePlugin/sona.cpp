@@ -154,9 +154,20 @@ namespace sona {
 	void automatic() {
 		// Auto Q
 		if (canCastQ(true)) {
+			// Auto Q x Targets
 			int autoQTargets = qMenu::autoTargets->get_int();
 			if (autoQTargets > 0 && enemiesInQRange() >= autoQTargets) {
 				q->cast();
+			}
+			// Auto Q Amplify
+			if (qMenu::amplifyAA->get_bool()) {
+				int directHitsMin = qMenu::amplifyDirect->get_int();
+				for (const auto& ally : entitylist->get_ally_heroes()) {
+					auto activeSpell = ally->get_active_spell();
+					if (activeSpell && activeSpell->is_auto_attack() && !ally->is_winding_up() && allyInAuraRange(ally)) {
+						if (enemiesInQRange() >= directHitsMin) q->cast();
+					}
+				}
 			}
 		}
 
@@ -188,7 +199,7 @@ namespace sona {
 			
 		}
 
-
+		
 	}
 
 	void combo() {
@@ -246,15 +257,6 @@ namespace sona {
 		}
 	}
 
-	void on_do_cast(game_object_script sender, spell_instance_script spell)
-	{
-		if (!qMenu::amplifyAA->get_bool()) return;
-		
-		if (sender && sender->is_valid() && sender->is_ai_hero() && sender->get_team()==myhero->get_team() && spell->is_auto_attack()) {
-			if (allyInAuraRange(sender) && canCastQ(true) && enemiesInQRange() >= qMenu::amplifyDirect->get_int())
-				q->cast();
-		}
-	}
 
 	void load() {
 		q = plugin_sdk->register_spell(spellslot::q, 825);
@@ -333,7 +335,6 @@ namespace sona {
 		
 		event_handler<events::on_draw>::add_callback(on_draw);
 		event_handler<events::on_update>::add_callback(on_update);
-		event_handler<events::on_do_cast>::add_callback(on_do_cast);
 		
 
 	}
@@ -348,7 +349,6 @@ namespace sona {
 
 		event_handler<events::on_draw>::remove_handler(on_draw);
 		event_handler<events::on_update>::remove_handler(on_update);
-		event_handler<events::on_do_cast>::remove_handler(on_do_cast);
 	}
 	
 }
