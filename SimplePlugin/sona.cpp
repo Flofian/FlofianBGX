@@ -45,6 +45,7 @@ namespace sona {
 		TreeEntry* autoShieldHeal = nullptr;
 		TreeEntry* autoShieldFactor = nullptr;
 		TreeEntry* includeSkillshots = nullptr;
+		TreeEntry* comboHealHP = nullptr;
 	}
 
 	namespace eMenu {
@@ -92,7 +93,7 @@ namespace sona {
 	bool isUnderTower(const game_object_script& target)
 	{
 		for (const auto& turret : entitylist->get_enemy_turrets())
-			if (turret && turret->is_valid() && target->get_position().distance(turret->get_position()) <= 750 + target->get_bounding_radius())
+			if (turret && turret->is_valid() && target->get_position().distance(turret->get_position()) <= 775 + target->get_bounding_radius()) //Should be 750, but i want small buffer
 				return true;
 		return false;
 	}
@@ -219,12 +220,20 @@ namespace sona {
 			}
 		}
 
+		// W
+		if (w->is_ready()) {
+			for (const auto& target : entitylist->get_ally_heroes()) {
+				if (target && target->is_valid() && target->get_health_percent() < wMenu::comboHealHP->get_int() && target->get_distance(myhero) < wMenu::range->get_int())
+					w->cast();
+			}
+		}
+
 		// R 
 		if (r->is_ready()) {
 			auto target = target_selector->get_target(rMenu::range->get_int(), damage_type::magical);
 			if (!target) return;
 			auto pred = r->get_prediction(target, true);
-			if (pred.hitchance >= hit_chance::high && pred.aoe_targets_hit_count() >= rMenu::comboTargets->get_int()) {
+			if (pred.hitchance >= hit_chance::very_high && pred.aoe_targets_hit_count() >= rMenu::comboTargets->get_int()) {
 				auto castpos = pred.get_cast_position();
 				r->cast(castpos);
 				if (generalMenu::debugMode->get_bool()) myhero->print_chat(0, "Combo R on %i Targets with hitchance %i", pred.aoe_targets_hit_count(), pred.hitchance);
@@ -247,7 +256,7 @@ namespace sona {
 		auto target = target_selector->get_target(rMenu::range->get_int(), damage_type::magical);
 		if (!target) return;
 		auto pred = r->get_prediction(target, true);
-		if (pred.hitchance >= hit_chance::high && pred.aoe_targets_hit_count() >= rMenu::semiTargets->get_int()) {
+		if (pred.hitchance >= hit_chance::very_high && pred.aoe_targets_hit_count() >= rMenu::semiTargets->get_int()) {
 			auto castpos = pred.get_cast_position();
 			r->cast(castpos);
 			if (generalMenu::debugMode->get_bool()) myhero->print_chat(0, "Semi R on %i Targets with hitchance %i", pred.aoe_targets_hit_count(), pred.hitchance);
@@ -286,15 +295,16 @@ namespace sona {
 				if (allyInAuraRange(target))
 					draw_manager->add_circle(target->get_position(), target->get_bounding_radius(), colorMenu::pColor->get_color());
 			}
+			
 		}
 	}
-
+	
 
 	void load() {
 		q = plugin_sdk->register_spell(spellslot::q, 825);
-		w = plugin_sdk->register_spell(spellslot::w, 1000);
+		w = plugin_sdk->register_spell(spellslot::w, 975);
 		e = plugin_sdk->register_spell(spellslot::e, 0);
-		r = plugin_sdk->register_spell(spellslot::r, 1000);
+		r = plugin_sdk->register_spell(spellslot::r, 950);
 		r->set_skillshot(0.25f, 140.0f, 2400.0f, { collisionable_objects::yasuo_wall }, skillshot_type::skillshot_line);
 		if (myhero->get_spell(spellslot::summoner1)->get_spell_data()->get_name_hash() == spell_hash("SummonerFlash"))
 			flash = plugin_sdk->register_spell(spellslot::summoner1, 400.f);
@@ -334,6 +344,8 @@ namespace sona {
 			{
 				wMenu->set_assigned_texture(myhero->get_spell(spellslot::w)->get_icon_texture());
 				wMenu::range = wMenu->add_slider(BASEKEY + ".wRange", "W Range", 975, 950, 1000);
+				wMenu::comboHealHP = wMenu->add_slider(BASEKEY + ".wComboHealHP", "Use in combo if ally under x% HP", 60, 0, 100);
+				qMenu->add_separator(BASEKEY + ".wsep", "Automatic");
 				wMenu::autoShield = wMenu->add_checkbox(BASEKEY + ".wAutoShield", "Shield Incoming Damage", true);
 				wMenu::autoShieldFactor = wMenu->add_slider(BASEKEY + ".wAutoShieldFactor", "Only when Shielding x Targets", 1, 1, 5);
 				wMenu::autoShieldFactor->set_tooltip("Depending on if you get a passive stack or not");
@@ -351,9 +363,13 @@ namespace sona {
 
 			auto rMenu = main_tab->add_tab(BASEKEY + ".r", "R Settings");
 			{
+				
 				rMenu->set_assigned_texture(myhero->get_spell(spellslot::r)->get_icon_texture());
 				rMenu->set_tooltip("Currently does not use Bounding Radius");
 				rMenu::range = rMenu->add_slider(BASEKEY + ".rRange", "R Range", 950, 900, 1000);
+				rMenu::range->add_property_change_callback([](TreeEntry* entry) {
+					r->set_range(rMenu::range->get_int());
+					});
 				rMenu::comboTargets = rMenu->add_slider(BASEKEY + ".rComboTargets", "Min Targets in Combo (0 to disable)", 3, 0, 5);
 				rMenu::semiKey = rMenu->add_hotkey(BASEKEY + ".rSemiKey", "Semi Key", TreeHotkeyMode::Hold, 0x54, false);
 				rMenu::semiTargets = rMenu->add_slider(BASEKEY + ".rSemiTargets", "Min Targets for Semi Key", 2, 1, 5);
