@@ -53,6 +53,13 @@ namespace sona {
 		TreeEntry* comboTargets = nullptr;
 	}
 
+	namespace rMenu {
+		TreeEntry* range = nullptr;
+		TreeEntry* comboTargets = nullptr;
+		TreeEntry* semiKey = nullptr;
+		TreeEntry* semiTargets = nullptr;
+	}
+
 	namespace drawMenu
 	{
 		TreeEntry* draw_range_p = nullptr;
@@ -211,6 +218,18 @@ namespace sona {
 				q->cast();
 			}
 		}
+
+		// R 
+		if (r->is_ready()) {
+			auto target = target_selector->get_target(rMenu::range->get_int(), damage_type::magical);
+			if (!target) return;
+			auto pred = r->get_prediction(target, true);
+			if (pred.hitchance >= hit_chance::high && pred.aoe_targets_hit_count() >= rMenu::comboTargets->get_int()) {
+				auto castpos = pred.get_cast_position();
+				r->cast(castpos);
+				if (generalMenu::debugMode->get_bool()) myhero->print_chat(0, "Combo R on %i Targets with hitchance %i", pred.aoe_targets_hit_count(), pred.hitchance);
+			}
+		}
 	}
 
 	void harass() {
@@ -223,6 +242,17 @@ namespace sona {
 		}
 	}
 
+	void semiR() {
+		if (myhero->is_dead() || !rMenu::semiKey->get_bool() || !r->is_ready()) return;
+		auto target = target_selector->get_target(rMenu::range->get_int(), damage_type::magical);
+		if (!target) return;
+		auto pred = r->get_prediction(target, true);
+		if (pred.hitchance >= hit_chance::high && pred.aoe_targets_hit_count() >= rMenu::semiTargets->get_int()) {
+			auto castpos = pred.get_cast_position();
+			r->cast(castpos);
+			if (generalMenu::debugMode->get_bool()) myhero->print_chat(0, "Semi R on %i Targets with hitchance %i", pred.aoe_targets_hit_count(), pred.hitchance);
+		}
+	}
 	
 	void on_update() {
 		if (myhero->is_dead())
@@ -230,6 +260,7 @@ namespace sona {
 		automatic();
 		if (orbwalker->combo_mode()) combo();
 		if (orbwalker->harass()) harass();
+		semiR();
 	}
 
 	void on_draw()
@@ -242,11 +273,11 @@ namespace sona {
 		if (q->is_ready() && drawMenu::draw_range_q->get_bool())
 			draw_manager->add_circle(myhero->get_position(), qMenu::range->get_int(), colorMenu::qColor->get_color());
 		if (w->is_ready() && drawMenu::draw_range_w->get_bool())
-			draw_manager->add_circle(myhero->get_position(), w->range(), colorMenu::wColor->get_color());
+			draw_manager->add_circle(myhero->get_position(), wMenu::range->get_int(), colorMenu::wColor->get_color());
 		if (e->is_ready() && drawMenu::draw_range_e->get_bool())
 			draw_manager->add_circle(myhero->get_position(), passiveMenu::auraRange->get_int(), colorMenu::eColor->get_color());
 		if (r->is_ready() && drawMenu::draw_range_r->get_bool())
-			draw_manager->add_circle(myhero->get_position(), r->range(), colorMenu::rColor->get_color());
+			draw_manager->add_circle(myhero->get_position(), rMenu::range->get_int(), colorMenu::rColor->get_color());
 
 
 		if (drawMenu::draw_range_p->get_bool()) {
@@ -316,6 +347,16 @@ namespace sona {
 				eMenu::antiMelee = eMenu->add_combobox(BASEKEY + ".eAntiMelee", "Anti Melee Mode", { {"Off", nullptr}, {"Self", nullptr}, {"Self + Ally", nullptr} }, 2);
 				eMenu::antiMeleeRange = eMenu->add_slider(BASEKEY + ".eAntiMeleeRange", "Anti Melee Range", 500, 100, 800);
 				eMenu::antiMeleeRange->set_tooltip("Auto E if Enemy in this range");
+			}
+
+			auto rMenu = main_tab->add_tab(BASEKEY + ".r", "R Settings");
+			{
+				rMenu->set_assigned_texture(myhero->get_spell(spellslot::r)->get_icon_texture());
+				rMenu->set_tooltip("Currently does not use Bounding Radius");
+				rMenu::range = rMenu->add_slider(BASEKEY + ".rRange", "R Range", 950, 900, 1000);
+				rMenu::comboTargets = rMenu->add_slider(BASEKEY + ".rComboTargets", "Min Targets in Combo (0 to disable)", 3, 0, 5);
+				rMenu::semiKey = rMenu->add_hotkey(BASEKEY + ".rSemiKey", "Semi Key", TreeHotkeyMode::Hold, 0x54, false);
+				rMenu::semiTargets = rMenu->add_slider(BASEKEY + ".rSemiTargets", "Min Targets for Semi Key", 2, 1, 5);
 			}
 			
 			auto drawMenu = main_tab->add_tab(BASEKEY + ".drawings", "Drawings Settings");
