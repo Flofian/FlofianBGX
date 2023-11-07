@@ -164,6 +164,7 @@ namespace sona {
 				int directHitsMin = qMenu::amplifyDirect->get_int();
 				for (const auto& ally : entitylist->get_ally_heroes()) {
 					auto activeSpell = ally->get_active_spell();
+					
 					if (activeSpell && activeSpell->is_auto_attack() && !ally->is_winding_up() && allyInAuraRange(ally)) {
 						if (enemiesInQRange() >= directHitsMin) q->cast();
 					}
@@ -268,7 +269,7 @@ namespace sona {
 			flash = plugin_sdk->register_spell(spellslot::summoner1, 400.f);
 		else if (myhero->get_spell(spellslot::summoner2)->get_spell_data()->get_name_hash() == spell_hash("SummonerFlash"))
 			flash = plugin_sdk->register_spell(spellslot::summoner2, 400.f);
-		main_tab = menu->create_tab(BASEKEY, "Sona");
+		main_tab = menu->create_tab(BASEKEY, "Flofian Sona");
 		main_tab->set_assigned_texture(myhero->get_square_icon_portrait());
 
 		// Menu init
@@ -282,30 +283,36 @@ namespace sona {
 			}
 			auto passiveMenu = main_tab->add_tab(BASEKEY + ".passive", "Passive Settings");
 			{
-				passiveMenu::auraRange = passiveMenu->add_slider(BASEKEY + ".pAuraRange", "Passive Range", 390, 350, 400);
+				passiveMenu->set_assigned_texture(myhero->get_passive_icon_texture());
+				passiveMenu::auraRange = passiveMenu->add_slider(BASEKEY + ".pAuraRange", "Aura Range", 390, 350, 400);
 				passiveMenu::useCenterEdge = passiveMenu->add_checkbox(BASEKEY + ".pCenterEdge", "Use Center-Edge Range", true);
 			}
 			auto qMenu = main_tab->add_tab(BASEKEY + ".q", "Q Settings");
 			{
+				qMenu->set_assigned_texture(myhero->get_spell(spellslot::q)->get_icon_texture());
 				qMenu::range = qMenu->add_slider(BASEKEY + ".qRange", "Q Range", 800, 750, 825);
 				qMenu::comboTargets = qMenu->add_slider(BASEKEY + ".qComboTargets", "Min Targets in Combo (0 to disable)", 1, 0, 2);
 				qMenu::harassTargets = qMenu->add_slider(BASEKEY + ".qHarassTargets", "Min Targets in Harass (0 to disable)", 1, 0, 2);
+				qMenu->add_separator(BASEKEY + ".qsep", "Automatic");
 				qMenu::autoTargets = qMenu->add_slider(BASEKEY + ".qAutoTargets", "Min Targets to Auto-use (0 to disable)", 2, 0, 2);
-				qMenu::amplifyAA = qMenu->add_checkbox(BASEKEY + "qAmplifyAA", "Use to amplify autoattacks (care auto cancells)", true);
+				qMenu::amplifyAA = qMenu->add_checkbox(BASEKEY + "qAmplifyAA", "Use to amplify autoattacks", true);
 				qMenu::amplifyDirect = qMenu->add_slider(BASEKEY + ".qAmplifyDirect", "^Only when also hitting x direct", 1, 0, 2);
 				qMenu::autoMana = qMenu->add_slider(BASEKEY + "qAutoMana", "Only auto use when above x% mana", 30, 0, 100);
 			}
 			auto wMenu = main_tab->add_tab(BASEKEY + ".w", "W Settings");
 			{
+				wMenu->set_assigned_texture(myhero->get_spell(spellslot::w)->get_icon_texture());
 				wMenu::range = wMenu->add_slider(BASEKEY + ".wRange", "W Range", 975, 950, 1000);
 				wMenu::autoShield = wMenu->add_checkbox(BASEKEY + ".wAutoShield", "Shield Incoming Damage", true);
 				wMenu::autoShieldFactor = wMenu->add_slider(BASEKEY + ".wAutoShieldFactor", "Only when Shielding x Targets", 1, 1, 5);
+				wMenu::autoShieldFactor->set_tooltip("Depending on if you get a passive stack or not");
 				wMenu::includeSkillshots = wMenu->add_checkbox(BASEKEY + ".wIncludeSkillshots", "Include Skillshots", true);
 				wMenu::autoShieldHeal = wMenu->add_slider(BASEKEY + ".wAutoShieldHeal", "Only when also healing x Targets", 1, 0, 2);
 			}
 			
 			auto eMenu = main_tab->add_tab(BASEKEY + ".e", "E Settings");
 			{
+				eMenu->set_assigned_texture(myhero->get_spell(spellslot::e)->get_icon_texture());
 				eMenu::antiMelee = eMenu->add_combobox(BASEKEY + ".eAntiMelee", "Anti Melee Mode", { {"Off", nullptr}, {"Self", nullptr}, {"Self + Ally", nullptr} }, 2);
 				eMenu::antiMeleeRange = eMenu->add_slider(BASEKEY + ".eAntiMeleeRange", "Anti Melee Range", 500, 100, 800);
 				eMenu::antiMeleeRange->set_tooltip("Auto E if Enemy in this range");
