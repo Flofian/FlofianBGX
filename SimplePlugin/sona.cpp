@@ -113,7 +113,8 @@ namespace sona {
 	bool isEnemyInERange(const game_object_script& target) {
 		int d = eMenu::antiMeleeRange->get_int();
 		for (const auto& enemy : entitylist->get_enemy_heroes()) {
-			if (target->get_distance(enemy) < d) return true;
+			if (target && target->is_valid()&&!target->is_dead()&&target->is_visible()){
+				if (target->get_distance(enemy) < d) return true;}
 		}
 		return false;
 	}
@@ -208,7 +209,6 @@ namespace sona {
 			
 		}
 
-		
 	}
 
 	void combo() {
@@ -226,6 +226,17 @@ namespace sona {
 				if (target && target->is_valid() && target->get_health_percent() < wMenu::comboHealHP->get_int() && target->get_distance(myhero) < wMenu::range->get_int())
 					w->cast();
 			}
+		}
+
+		// E
+		if (e->is_ready()) {
+			int minTargets = eMenu::comboTargets->get_int();
+			int count = 0;
+			for (const auto& target : entitylist->get_ally_heroes()) {
+				if (target && target->is_valid() && !target->is_dead() && allyInAuraRange(target)) count++;
+			}
+			if (minTargets>0 && count >= minTargets) e->cast();
+
 		}
 
 		// R 
@@ -356,6 +367,7 @@ namespace sona {
 			auto eMenu = main_tab->add_tab(BASEKEY + ".e", "E Settings");
 			{
 				eMenu->set_assigned_texture(myhero->get_spell(spellslot::e)->get_icon_texture());
+				eMenu::comboTargets = eMenu->add_slider(BASEKEY + ".eComboTargets", "E in combo when x allies in range (0 to disable)", 3, 0, 5);
 				eMenu::antiMelee = eMenu->add_combobox(BASEKEY + ".eAntiMelee", "Anti Melee Mode", { {"Off", nullptr}, {"Self", nullptr}, {"Self + Ally", nullptr} }, 2);
 				eMenu::antiMeleeRange = eMenu->add_slider(BASEKEY + ".eAntiMeleeRange", "Anti Melee Range", 500, 100, 800);
 				eMenu::antiMeleeRange->set_tooltip("Auto E if Enemy in this range");
