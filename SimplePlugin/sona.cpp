@@ -1,6 +1,8 @@
 #include "../plugin_sdk/plugin_sdk.hpp"
 #include "sona.h"
 
+#define BASEKEY "Flofian."+myhero->get_model()
+
 namespace sona {
 	script_spell* q = nullptr;
 	script_spell* w = nullptr;
@@ -43,6 +45,12 @@ namespace sona {
 		TreeEntry* autoShieldHeal = nullptr;
 		TreeEntry* autoShieldFactor = nullptr;
 		TreeEntry* includeSkillshots = nullptr;
+	}
+
+	namespace eMenu {
+		TreeEntry* antiMelee = nullptr;
+		TreeEntry* antiMeleeRange = nullptr;
+		TreeEntry* comboTargets = nullptr;
 	}
 
 	namespace drawMenu
@@ -93,6 +101,15 @@ namespace sona {
 			(!generalMenu::recallCheck->get_bool() || !myhero->is_recalling()) && (!generalMenu::turretCheck->get_bool()||!isUnderTower(myhero)));
 		return q->is_ready() && autoCheck;
 	}
+
+	bool isEnemyInERange(const game_object_script& target) {
+		int d = eMenu::antiMeleeRange->get_int();
+		for (const auto& enemy : entitylist->get_enemy_heroes()) {
+			if (target->get_distance(enemy) < d) return true;
+		}
+		return false;
+	}
+
 	bool canCastW() {
 		return w->is_ready() && (!generalMenu::recallCheck->get_bool() || !myhero->is_recalling());
 	}
@@ -151,6 +168,24 @@ namespace sona {
 			if (totalShielded >= wMenu::autoShieldFactor->get_int() && countAlliesHealed() >= minHealTargets) {
 				w->cast();
 			}
+		}
+
+		// Auto E
+		if (e->is_ready() && (!generalMenu::recallCheck->get_bool() || !myhero->is_recalling())) {
+			switch (eMenu::antiMelee->get_int()) {
+			case 1:
+				if (isEnemyInERange(myhero)) e->cast();
+				break;
+			case 2:
+				for (const auto& target : entitylist->get_ally_heroes()) {
+					if (allyInAuraRange(target) && isEnemyInERange(target)) { e->cast(); break; }
+
+				}
+				break;
+
+			default: break;
+			}
+			
 		}
 
 
@@ -231,61 +266,68 @@ namespace sona {
 			flash = plugin_sdk->register_spell(spellslot::summoner1, 400.f);
 		else if (myhero->get_spell(spellslot::summoner2)->get_spell_data()->get_name_hash() == spell_hash("SummonerFlash"))
 			flash = plugin_sdk->register_spell(spellslot::summoner2, 400.f);
-		main_tab = menu->create_tab("sona", "Sona");
+		main_tab = menu->create_tab(BASEKEY, "Sona");
 		main_tab->set_assigned_texture(myhero->get_square_icon_portrait());
 
 		// Menu init
 		{
-			auto generalMenu = main_tab->add_tab(myhero->get_model() + ".general", "General Settings");
+			auto generalMenu = main_tab->add_tab(BASEKEY + ".general", "General Settings");
 			{
-				generalMenu::recallCheck = generalMenu->add_checkbox(myhero->get_model() + ".gRecall", "Dont use anything automatically while recalling", true);
-				generalMenu::turretCheck = generalMenu->add_checkbox(myhero->get_model() + ".gTurret", "Dont use anything automatically under Enemy turret", true);
-				generalMenu::adaptiveMana = generalMenu->add_checkbox(myhero->get_model() + ".gAdaptiveMana", "Does nothing yet", true);
-				generalMenu::debugMode = generalMenu->add_checkbox(myhero->get_model() + "debug", "Debug Mode", false);
+				generalMenu::recallCheck = generalMenu->add_checkbox(BASEKEY + ".gRecall", "Dont use anything automatically while recalling", true);
+				generalMenu::turretCheck = generalMenu->add_checkbox(BASEKEY + ".gTurret", "Dont use anything automatically under Enemy turret", true);
+				generalMenu::adaptiveMana = generalMenu->add_checkbox(BASEKEY + ".gAdaptiveMana", "Does nothing yet", true);
+				generalMenu::debugMode = generalMenu->add_checkbox(BASEKEY + ".debug", "Debug Mode", false);
 			}
-			auto passiveMenu = main_tab->add_tab(myhero->get_model() + ".passive", "Passive Settings");
+			auto passiveMenu = main_tab->add_tab(BASEKEY + ".passive", "Passive Settings");
 			{
-				passiveMenu::auraRange = passiveMenu->add_slider(myhero->get_model() + ".pAuraRange", "Passive Range", 390, 350, 400);
-				passiveMenu::useCenterEdge = passiveMenu->add_checkbox(myhero->get_model() + ".pCenterEdge", "Use Center-Edge Range", true);
+				passiveMenu::auraRange = passiveMenu->add_slider(BASEKEY + ".pAuraRange", "Passive Range", 390, 350, 400);
+				passiveMenu::useCenterEdge = passiveMenu->add_checkbox(BASEKEY + ".pCenterEdge", "Use Center-Edge Range", true);
 			}
-			auto qMenu = main_tab->add_tab(myhero->get_model() + ".q", "Q Settings");
+			auto qMenu = main_tab->add_tab(BASEKEY + ".q", "Q Settings");
 			{
-				qMenu::range = qMenu->add_slider(myhero->get_model() + ".qRange", "Q Range", 800, 750, 825);
-				qMenu::comboTargets = qMenu->add_slider(myhero->get_model() + ".qComboTargets", "Min Targets in Combo (0 to disable)", 1, 0, 2);
-				qMenu::harassTargets = qMenu->add_slider(myhero->get_model() + ".qHarassTargets", "Min Targets in Harass (0 to disable)", 1, 0, 2);
-				qMenu::autoTargets = qMenu->add_slider(myhero->get_model() + ".qAutoTargets", "Min Targets to Auto-use (0 to disable)", 2, 0, 2);
-				qMenu::amplifyAA = qMenu->add_checkbox(myhero->get_model() + "qAmplifyAA", "Use to amplify autoattacks (care auto cancells)", true);
-				qMenu::amplifyDirect = qMenu->add_slider(myhero->get_model() + ".qAmplifyDirect", "^Only when also hitting x direct", 1, 0, 2);
-				qMenu::autoMana = qMenu->add_slider(myhero->get_model() + "qAutoMana", "Only auto use when above x% mana", 30, 0, 100);
+				qMenu::range = qMenu->add_slider(BASEKEY + ".qRange", "Q Range", 800, 750, 825);
+				qMenu::comboTargets = qMenu->add_slider(BASEKEY + ".qComboTargets", "Min Targets in Combo (0 to disable)", 1, 0, 2);
+				qMenu::harassTargets = qMenu->add_slider(BASEKEY + ".qHarassTargets", "Min Targets in Harass (0 to disable)", 1, 0, 2);
+				qMenu::autoTargets = qMenu->add_slider(BASEKEY + ".qAutoTargets", "Min Targets to Auto-use (0 to disable)", 2, 0, 2);
+				qMenu::amplifyAA = qMenu->add_checkbox(BASEKEY + "qAmplifyAA", "Use to amplify autoattacks (care auto cancells)", true);
+				qMenu::amplifyDirect = qMenu->add_slider(BASEKEY + ".qAmplifyDirect", "^Only when also hitting x direct", 1, 0, 2);
+				qMenu::autoMana = qMenu->add_slider(BASEKEY + "qAutoMana", "Only auto use when above x% mana", 30, 0, 100);
 			}
-			auto wMenu = main_tab->add_tab(myhero->get_model() + ".w", "W Settings");
+			auto wMenu = main_tab->add_tab(BASEKEY + ".w", "W Settings");
 			{
-				wMenu::range = wMenu->add_slider(myhero->get_model() + ".wRange", "W Range", 975, 950, 1000);
-				wMenu::autoShield = wMenu->add_checkbox(myhero->get_model() + ".wAutoShield", "Shield Incoming Damage", true);
-				wMenu::autoShieldFactor = wMenu->add_slider(myhero->get_model() + ".wAutoShieldFactor", "Only when Shielding x Targets", 1, 1, 5);
-				wMenu::includeSkillshots = wMenu->add_checkbox(myhero->get_model() + ".wIncludeSkillshots", "Include Skillshots", true);
-				wMenu::autoShieldHeal = wMenu->add_slider(myhero->get_model() + ".wAutoShieldHeal", "Only when also healing x Targets", 1, 0, 2);
+				wMenu::range = wMenu->add_slider(BASEKEY + ".wRange", "W Range", 975, 950, 1000);
+				wMenu::autoShield = wMenu->add_checkbox(BASEKEY + ".wAutoShield", "Shield Incoming Damage", true);
+				wMenu::autoShieldFactor = wMenu->add_slider(BASEKEY + ".wAutoShieldFactor", "Only when Shielding x Targets", 1, 1, 5);
+				wMenu::includeSkillshots = wMenu->add_checkbox(BASEKEY + ".wIncludeSkillshots", "Include Skillshots", true);
+				wMenu::autoShieldHeal = wMenu->add_slider(BASEKEY + ".wAutoShieldHeal", "Only when also healing x Targets", 1, 0, 2);
 			}
 			
-			auto drawMenu = main_tab->add_tab(myhero->get_model() + ".drawings", "Drawings Settings");
+			auto eMenu = main_tab->add_tab(BASEKEY + ".e", "E Settings");
 			{
-				drawMenu::draw_range_p = drawMenu->add_checkbox(myhero->get_model() + ".drawingP", "Draw Allies in Aura Range", true);
-				drawMenu::draw_range_q = drawMenu->add_checkbox(myhero->get_model() + ".drawingQ", "Draw Q range", true);
-				drawMenu::draw_range_w = drawMenu->add_checkbox(myhero->get_model() + ".drawingW", "Draw W range", true);
-				drawMenu::draw_range_e = drawMenu->add_checkbox(myhero->get_model() + ".drawingE", "Draw E range", true);
-				drawMenu::draw_range_r = drawMenu->add_checkbox(myhero->get_model() + ".drawingR", "Draw R range", true);
-				auto colorMenu = drawMenu->add_tab(myhero->get_model() + ".color", "Color Settings");
+				eMenu::antiMelee = eMenu->add_combobox(BASEKEY + ".eAntiMelee", "Anti Melee Mode", { {"Off", nullptr}, {"Self", nullptr}, {"Self + Ally", nullptr} }, 2);
+				eMenu::antiMeleeRange = eMenu->add_slider(BASEKEY + ".eAntiMeleeRange", "Anti Melee Range", 500, 100, 800);
+				eMenu::antiMeleeRange->set_tooltip("Auto E if Enemy in this range");
+			}
+			
+			auto drawMenu = main_tab->add_tab(BASEKEY + ".drawings", "Drawings Settings");
+			{
+				drawMenu::draw_range_p = drawMenu->add_checkbox(BASEKEY + ".drawingP", "Draw Allies in Aura Range", true);
+				drawMenu::draw_range_q = drawMenu->add_checkbox(BASEKEY + ".drawingQ", "Draw Q range", true);
+				drawMenu::draw_range_w = drawMenu->add_checkbox(BASEKEY + ".drawingW", "Draw W range", true);
+				drawMenu::draw_range_e = drawMenu->add_checkbox(BASEKEY + ".drawingE", "Draw E range", true);
+				drawMenu::draw_range_r = drawMenu->add_checkbox(BASEKEY + ".drawingR", "Draw R range", true);
+				auto colorMenu = drawMenu->add_tab(BASEKEY + ".color", "Color Settings");
 				float pcolor[] = { 0.f, 1.f, 0.f, 1.f };
-				colorMenu::pColor = colorMenu->add_colorpick(myhero->get_model() + ".colorP", "Ally in Aura Color", pcolor);
+				colorMenu::pColor = colorMenu->add_colorpick(BASEKEY + ".colorP", "Ally in Aura Color", pcolor);
 
 				float qcolor[] = { 0.f, 0.f, 1.f, 1.f };
-				colorMenu::qColor = colorMenu->add_colorpick(myhero->get_model() + ".colorQ", "Q Range Color", qcolor);
+				colorMenu::qColor = colorMenu->add_colorpick(BASEKEY + ".colorQ", "Q Range Color", qcolor);
 				float wcolor[] = { 0.f, 1.f, 0.f, 1.f };
-				colorMenu::wColor = colorMenu->add_colorpick(myhero->get_model() + ".colorW", "W Range Color", wcolor);
+				colorMenu::wColor = colorMenu->add_colorpick(BASEKEY + ".colorW", "W Range Color", wcolor);
 				float ecolor[] = { 1.f, 0.f, 1.f, 1.f };
-				colorMenu::eColor = colorMenu->add_colorpick(myhero->get_model() + ".colorE", "E Range Color", ecolor);
+				colorMenu::eColor = colorMenu->add_colorpick(BASEKEY + ".colorE", "E Range Color", ecolor);
 				float rcolor[] = { 1.f, 1.f, 0.f, 1.f };
-				colorMenu::rColor = colorMenu->add_colorpick(myhero->get_model() + ".colorR", "R Range Color", rcolor);
+				colorMenu::rColor = colorMenu->add_colorpick(BASEKEY + ".colorR", "R Range Color", rcolor);
 			}
 		}
 		
