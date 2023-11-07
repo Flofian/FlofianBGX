@@ -114,8 +114,9 @@ namespace sona {
 	bool isEnemyInERange(const game_object_script& target) {
 		int d = eMenu::antiMeleeRange->get_int();
 		for (const auto& enemy : entitylist->get_enemy_heroes()) {
-			if (target && target->is_valid()&&!target->is_dead()&&target->is_visible()){
-				if (target->get_distance(enemy) < d) return true;}
+			if (enemy && enemy->is_valid()&&!enemy->is_dead()&& enemy->is_visible()){
+				if (target->get_distance(enemy) < d) return true;
+			}
 		}
 		return false;
 	}
