@@ -59,6 +59,7 @@ namespace sona {
 		TreeEntry* comboTargets = nullptr;
 		TreeEntry* semiKey = nullptr;
 		TreeEntry* semiTargets = nullptr;
+		TreeEntry* interrupt = nullptr;
 	}
 
 	namespace drawMenu
@@ -175,7 +176,10 @@ namespace sona {
 					auto activeSpell = ally->get_active_spell();
 					
 					if (activeSpell && activeSpell->is_auto_attack() && !ally->is_winding_up() && allyInAuraRange(ally)) {
-						if (enemiesInQRange() >= directHitsMin) q->cast();
+						auto lastTargetId = activeSpell->get_last_target_id();
+						auto lastTarget = entitylist->get_object(lastTargetId);
+						
+						if (lastTarget && lastTarget->is_valid() && lastTarget->is_ai_hero() && enemiesInQRange() >= directHitsMin) q->cast();
 					}
 				}
 			}
@@ -209,6 +213,19 @@ namespace sona {
 			
 		}
 
+		// R interrupt
+		if (r->is_ready() && (!generalMenu::recallCheck->get_bool() || !myhero->is_recalling()) && rMenu::interrupt->get_bool()) {
+			for (const auto& target : entitylist->get_enemy_heroes()) {
+				if (target && target->is_valid() && target->is_visible() && !target->is_zombie() && target->is_valid_target(rMenu::range->get_int()) && target->is_casting_interruptible_spell() >= 2) {
+					auto pred = r->get_prediction(target, true);
+					if (pred.hitchance >= hit_chance::very_high) {
+						r->cast(pred.get_cast_position());
+						if (generalMenu::debugMode->get_bool()) myhero->print_chat(0, "Interrupt R on %i Targets with hitchance %i", pred.aoe_targets_hit_count(), pred.hitchance);
+					}
+				}
+
+			}
+		}
 	}
 
 	void combo() {
@@ -385,6 +402,8 @@ namespace sona {
 				rMenu::comboTargets = rMenu->add_slider(BASEKEY + ".rComboTargets", "Min Targets in Combo (0 to disable)", 3, 0, 5);
 				rMenu::semiKey = rMenu->add_hotkey(BASEKEY + ".rSemiKey", "Semi Key", TreeHotkeyMode::Hold, 0x54, false);
 				rMenu::semiTargets = rMenu->add_slider(BASEKEY + ".rSemiTargets", "Min Targets for Semi Key", 2, 1, 5);
+				rMenu::interrupt = rMenu->add_checkbox(BASEKEY + ".rInterrupt", "Use for Interrupt", true);
+
 			}
 			
 			auto drawMenu = main_tab->add_tab(BASEKEY + ".drawings", "Drawings Settings");
