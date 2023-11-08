@@ -206,7 +206,6 @@ namespace sona {
 		if (w->is_ready() && (!generalMenu::recallCheck->get_bool() || !myhero->is_recalling()) && wMenu::autoShield->get_bool()) {
 			int minHealTargets = wMenu::autoShieldHeal->get_int();
 			int totalShielded = countShieldedChamps();
-			//myhero->print_chat(0, "Heal: %i Shield: %i", countAlliesHealed(), totalShielded);
 			if (totalShielded >= wMenu::autoShieldFactor->get_int() && countHealedChamps() >= minHealTargets) {
 				w->cast();
 			}
@@ -248,7 +247,7 @@ namespace sona {
 	void combo() {
 		// Q
 		if (canCastQ(false)) {
-			int minTargets = adaptiveMana ? (2*(manaPerc>5) - manaPerc>=20) : qMenu::comboTargets->get_int(); // 0 if under 5%, 2 under 20%, else 1
+			int minTargets = adaptiveMana ? (2 * (manaPerc > 5) - (manaPerc >= 20)) : qMenu::comboTargets->get_int(); // 0 if under 5%, 2 under 20%, else 1
 			if (minTargets > 0 && countEnemiesInQRange() >= minTargets) {
 				q->cast();
 			}
@@ -265,7 +264,7 @@ namespace sona {
 
 		// E
 		if (e->is_ready()) {
-			int minTargets =  adaptiveMana ? (4*(manaPerc>10)-manaPerc>30) : eMenu::comboTargets->get_int(); // 0 if under 10%, 4 if under 30%, else 3
+			int minTargets =  adaptiveMana ? (4*(manaPerc>10)-(manaPerc>30)) : eMenu::comboTargets->get_int(); // 0 if under 10%, 4 if under 30%, else 3
 			int count = 0;
 			for (const auto& target : entitylist->get_ally_heroes()) {
 				if (target && target->is_valid() && !target->is_dead() && isAllyInAuraRange(target)) count++;
@@ -290,7 +289,7 @@ namespace sona {
 	void harass() {
 		// Q
 		if (canCastQ(false)) {
-			int minTargets = adaptiveMana ? (2 * (manaPerc > 5) - manaPerc >= 40) : qMenu::comboTargets->get_int(); // 0 if under 5%, 2 under 40%, else 1
+			int minTargets = adaptiveMana ? (2 * (manaPerc > 5) - (manaPerc >= 40)) : qMenu::comboTargets->get_int(); // 0 if under 5%, 2 under 40%, else 1
 			if (minTargets > 0 && countEnemiesInQRange() >= minTargets) {
 				q->cast();
 			}
