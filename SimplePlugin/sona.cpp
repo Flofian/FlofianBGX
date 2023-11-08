@@ -372,6 +372,7 @@ namespace sona {
 				generalMenu::adaptiveMana->set_tooltip("This removes most of the sliders and instead uses your mana to calc the number of targets\n"
 														"To find the values used by Adaptive Mana Mode, disable it, then hover of the respective Sliders");
 				generalMenu::debugMode = generalMenu->add_checkbox(BASEKEY + ".debug", "Debug Mode", false);
+				generalMenu::debugMode->is_hidden() = generalMenu::debugMode->get_bool();		// so only i have it on, dont want to hide it entirely
 				generalMenu::adaptiveMana->add_property_change_callback([](TreeEntry* entry) {
 					if (entry->get_bool()) {
 						qMenu::comboTargets->is_hidden() = true;
