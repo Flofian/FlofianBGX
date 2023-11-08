@@ -11,6 +11,7 @@ namespace sona {
 
 	bool adaptiveMana = false;
 	float manaPerc = 1;
+	bool isAram = false;
 
 	TreeTab* mainMenuTab = nullptr;
 
@@ -82,7 +83,8 @@ namespace sona {
 		TreeEntry* eColor = nullptr;
 		TreeEntry* rColor = nullptr;
 	}
-	// Helper functions ...
+
+	// Helper functions
 	bool isUnderTower(const game_object_script& target)
 	{
 		for (const auto& turret : entitylist->get_enemy_turrets())
@@ -134,6 +136,9 @@ namespace sona {
 	float wHealStrength(const game_object_script& target) {
 		//Same as wShieldStrength
 		float baseHeal = 15 + 15 * w->level() + 0.15f * myhero->get_total_ability_power();
+		if (isAram) {
+			return baseHeal * 0.4f;
+		}
 		return baseHeal;
 	}
 	int countHealedChamps() {
@@ -500,6 +505,11 @@ namespace sona {
 		event_handler<events::on_draw>::add_callback(on_draw);
 		event_handler<events::on_update>::add_callback(on_update);
 		
+		for (const auto& buff : myhero->get_bufflist())
+		{
+			if (!buff || !buff->is_valid()) continue;
+			if (buff->get_hash_name() == buff_hash("HowlingAbyssAura")) isAram = true;
+		}
 
 	}
 	void unload()
