@@ -282,11 +282,12 @@ namespace sona {
 		if (r->is_ready()) {
 			auto target = target_selector->get_target(rMenu::range->get_int(), damage_type::magical);
 			if (!target) return;
-			auto pred = r->get_prediction(target, true);
-			if (pred.hitchance >= getHitchance(rMenu::hitchance->get_int()) && pred.aoe_targets_hit_count() >= rMenu::comboTargets->get_int()) {
+			int minTargets = rMenu::comboTargets->get_int();
+			auto pred = r->get_prediction(target, minTargets>1);
+			if (pred.hitchance >= getHitchance(rMenu::hitchance->get_int()) && (minTargets == 1 || pred.aoe_targets_hit_count() >= rMenu::comboTargets->get_int())) {
 				auto castpos = pred.get_cast_position();
 				r->cast(castpos);
-				if (generalMenu::debugMode->get_bool()) myhero->print_chat(0, "Combo R on %i Targets with hitchance %i", pred.aoe_targets_hit_count(), pred.hitchance);
+				if (generalMenu::debugMode->get_bool()) myhero->print_chat(0, "Combo R on %i Targets with hitchance %i", minTargets > 1 ? pred.aoe_targets_hit_count() : 1, pred.hitchance);
 			}
 		}
 	}
@@ -305,11 +306,12 @@ namespace sona {
 		if (myhero->is_dead() || !rMenu::semiKey->get_bool() || !r->is_ready()) return;
 		auto target = target_selector->get_target(rMenu::range->get_int(), damage_type::magical);
 		if (!target) return;
-		auto pred = r->get_prediction(target, true);
-		if (pred.hitchance >= getHitchance(rMenu::hitchance->get_int()) && pred.aoe_targets_hit_count() >= rMenu::semiTargets->get_int()) {
+		int minTargets = rMenu::semiTargets->get_int();
+		auto pred = r->get_prediction(target, minTargets>1);
+		if (pred.hitchance >= getHitchance(rMenu::hitchance->get_int()) && (minTargets == 1 || pred.aoe_targets_hit_count() >= rMenu::semiTargets->get_int())) {
 			auto castpos = pred.get_cast_position();
 			r->cast(castpos);
-			if (generalMenu::debugMode->get_bool()) myhero->print_chat(0, "Semi R on %i Targets with hitchance %i", pred.aoe_targets_hit_count(), pred.hitchance);
+			if (generalMenu::debugMode->get_bool()) myhero->print_chat(0, "Semi R on %i Targets with hitchance %i", minTargets>1 ? pred.aoe_targets_hit_count() : 1, pred.hitchance);
 		}
 	}
 	
