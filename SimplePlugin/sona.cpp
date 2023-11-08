@@ -137,7 +137,7 @@ namespace sona {
 		//Same as wShieldStrength
 		float baseHeal = 15 + 15 * w->level() + 0.15f * myhero->get_total_ability_power();
 		if (isAram) {
-			return baseHeal * 0.4f;
+			return baseHeal * 0.6f;
 		}
 		return baseHeal;
 	}
