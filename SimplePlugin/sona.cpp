@@ -9,7 +9,6 @@ namespace sona {
 	script_spell* e = nullptr;
 	script_spell* r = nullptr;
 
-	script_spell* flash = nullptr;
 	bool adaptiveMana = false;
 	float manaPerc = 1;
 
@@ -340,10 +339,6 @@ namespace sona {
 		e = plugin_sdk->register_spell(spellslot::e, 0);
 		r = plugin_sdk->register_spell(spellslot::r, 950);
 		r->set_skillshot(0.25f, 140.0f, 2400.0f, { collisionable_objects::yasuo_wall }, skillshot_type::skillshot_line);
-		if (myhero->get_spell(spellslot::summoner1)->get_spell_data()->get_name_hash() == spell_hash("SummonerFlash"))
-			flash = plugin_sdk->register_spell(spellslot::summoner1, 400.f);
-		else if (myhero->get_spell(spellslot::summoner2)->get_spell_data()->get_name_hash() == spell_hash("SummonerFlash"))
-			flash = plugin_sdk->register_spell(spellslot::summoner2, 400.f);
 		main_tab = menu->create_tab(BASEKEY, "Flofian Sona");
 		main_tab->set_assigned_texture(myhero->get_square_icon_portrait());
 
@@ -423,7 +418,6 @@ namespace sona {
 				wMenu::includeSkillshots = wMenu->add_checkbox(BASEKEY + ".wIncludeSkillshots", "Include Skillshots", true);
 				wMenu::autoShieldHeal = wMenu->add_slider(BASEKEY + ".wAutoShieldHeal", "Only when also healing x Targets", 1, 0, 2);
 			}
-			
 			auto eMenu = main_tab->add_tab(BASEKEY + ".e", "E Settings");
 			{
 				eMenu->set_assigned_texture(myhero->get_spell(spellslot::e)->get_icon_texture());
@@ -433,7 +427,6 @@ namespace sona {
 				eMenu::antiMeleeRange = eMenu->add_slider(BASEKEY + ".eAntiMeleeRange", "Anti Melee Range", 500, 100, 800);
 				eMenu::antiMeleeRange->set_tooltip("Auto E if Enemy in this range");
 			}
-
 			auto rMenu = main_tab->add_tab(BASEKEY + ".r", "R Settings");
 			{
 				
@@ -448,7 +441,6 @@ namespace sona {
 				rMenu::interrupt = rMenu->add_checkbox(BASEKEY + ".rInterrupt", "Use for Interrupt", true);
 
 			}
-			
 			auto drawMenu = main_tab->add_tab(BASEKEY + ".drawings", "Drawings Settings");
 			{
 				drawMenu::draw_range_p = drawMenu->add_checkbox(BASEKEY + ".drawingP", "Draw Allies in Aura Range", true);
@@ -499,8 +491,6 @@ namespace sona {
 		plugin_sdk->remove_spell(w);
 		plugin_sdk->remove_spell(e);
 		plugin_sdk->remove_spell(r);
-		if (flash)
-			plugin_sdk->remove_spell(flash);
 
 		event_handler<events::on_draw>::remove_handler(on_draw);
 		event_handler<events::on_update>::remove_handler(on_update);
