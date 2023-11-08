@@ -12,7 +12,7 @@ namespace sona {
 	bool adaptiveMana = false;
 	float manaPerc = 1;
 
-	TreeTab* main_tab = nullptr;
+	TreeTab* mainMenuTab = nullptr;
 
 	namespace generalMenu
 	{
@@ -65,12 +65,14 @@ namespace sona {
 	}
 
 	namespace drawMenu
-	{
-		TreeEntry* draw_range_p = nullptr;
-		TreeEntry* draw_range_q = nullptr;
-		TreeEntry* draw_range_w = nullptr;
-		TreeEntry* draw_range_e = nullptr;
-		TreeEntry* draw_range_r = nullptr;
+	{	
+		TreeEntry* drawOnlyReady = nullptr;
+		TreeEntry* drawAuraTargets = nullptr;
+		TreeEntry* drawRangeQ = nullptr;
+		TreeEntry* drawRangeW = nullptr;
+		TreeEntry* drawRangeE = nullptr;
+		TreeEntry* drawRangeR = nullptr;
+
 		
 	}
 	namespace colorMenu
@@ -312,17 +314,17 @@ namespace sona {
 			return;
 		}
 
-		if (q->is_ready() && drawMenu::draw_range_q->get_bool())
+		if ((q->is_ready() || !drawMenu::drawOnlyReady->get_bool()) && drawMenu::drawRangeQ->get_bool())
 			draw_manager->add_circle(myhero->get_position(), qMenu::range->get_int(), colorMenu::qColor->get_color());
-		if (w->is_ready() && drawMenu::draw_range_w->get_bool())
+		if ((w->is_ready() || !drawMenu::drawOnlyReady->get_bool()) && drawMenu::drawRangeW->get_bool())
 			draw_manager->add_circle(myhero->get_position(), wMenu::range->get_int(), colorMenu::wColor->get_color());
-		if (e->is_ready() && drawMenu::draw_range_e->get_bool())
+		if ((e->is_ready() || !drawMenu::drawOnlyReady->get_bool()) && drawMenu::drawRangeE->get_bool())
 			draw_manager->add_circle(myhero->get_position(), passiveMenu::auraRange->get_int(), colorMenu::eColor->get_color());
-		if (r->is_ready() && drawMenu::draw_range_r->get_bool())
+		if ((r->is_ready() || !drawMenu::drawOnlyReady->get_bool()) && drawMenu::drawRangeR->get_bool())
 			draw_manager->add_circle(myhero->get_position(), rMenu::range->get_int(), colorMenu::rColor->get_color());
 
 
-		if (drawMenu::draw_range_p->get_bool()) {
+		if (drawMenu::drawAuraTargets->get_bool()) {
 			for (const auto& target : entitylist->get_ally_heroes()) {
 				if (target->is_me()) continue;
 				if (isAllyInAuraRange(target))
@@ -339,13 +341,13 @@ namespace sona {
 		e = plugin_sdk->register_spell(spellslot::e, 0);
 		r = plugin_sdk->register_spell(spellslot::r, 950);
 		r->set_skillshot(0.25f, 140.0f, 2400.0f, { collisionable_objects::yasuo_wall }, skillshot_type::skillshot_line);
-		main_tab = menu->create_tab(BASEKEY, "Flofian Sona");
-		main_tab->set_assigned_texture(myhero->get_square_icon_portrait());
+		mainMenuTab = menu->create_tab(BASEKEY, "Flofian Sona");
+		mainMenuTab->set_assigned_texture(myhero->get_square_icon_portrait());
 
 		// Menu init
 		{	
 			
-			auto generalMenu = main_tab->add_tab(BASEKEY + ".general", "General Settings");
+			auto generalMenu = mainMenuTab->add_tab(BASEKEY + ".general", "General Settings");
 			{
 				generalMenu::recallCheck = generalMenu->add_checkbox(BASEKEY + ".gRecall", "Dont use anything automatically while recalling", true);
 				generalMenu::turretCheck = generalMenu->add_checkbox(BASEKEY + ".gTurret", "Dont use anything automatically under Enemy turret", true);
@@ -382,13 +384,13 @@ namespace sona {
 					}
 				});
 			}
-			auto passiveMenu = main_tab->add_tab(BASEKEY + ".passive", "Passive Settings");
+			auto passiveMenu = mainMenuTab->add_tab(BASEKEY + ".passive", "Passive Settings");
 			{
 				passiveMenu->set_assigned_texture(myhero->get_passive_icon_texture());
 				passiveMenu::auraRange = passiveMenu->add_slider(BASEKEY + ".pAuraRange", "Aura Range", 390, 350, 400);
 				passiveMenu::useCenterEdge = passiveMenu->add_checkbox(BASEKEY + ".pCenterEdge", "Use Center-Edge Range", true);
 			}
-			auto qMenu = main_tab->add_tab(BASEKEY + ".q", "Q Settings");
+			auto qMenu = mainMenuTab->add_tab(BASEKEY + ".q", "Q Settings");
 			{
 				qMenu->set_assigned_texture(myhero->get_spell(spellslot::q)->get_icon_texture());
 				qMenu::range = qMenu->add_slider(BASEKEY + ".qRange", "Q Range", 800, 750, 825);
@@ -405,7 +407,7 @@ namespace sona {
 				qMenu::amplifyDirect->set_tooltip("Adaptive Mana:\nunder 20%: Disabled\nunder 40%: 2\nabove 40%: 1");
 				qMenu::autoMana = qMenu->add_slider(BASEKEY + "qAutoMana", "Only auto use when above x% mana", 30, 0, 100);
 			}
-			auto wMenu = main_tab->add_tab(BASEKEY + ".w", "W Settings");
+			auto wMenu = mainMenuTab->add_tab(BASEKEY + ".w", "W Settings");
 			{
 				wMenu->set_assigned_texture(myhero->get_spell(spellslot::w)->get_icon_texture());
 				wMenu::range = wMenu->add_slider(BASEKEY + ".wRange", "W Range", 975, 950, 1000);
@@ -418,7 +420,7 @@ namespace sona {
 				wMenu::includeSkillshots = wMenu->add_checkbox(BASEKEY + ".wIncludeSkillshots", "Include Skillshots", true);
 				wMenu::autoShieldHeal = wMenu->add_slider(BASEKEY + ".wAutoShieldHeal", "Only when also healing x Targets", 1, 0, 2);
 			}
-			auto eMenu = main_tab->add_tab(BASEKEY + ".e", "E Settings");
+			auto eMenu = mainMenuTab->add_tab(BASEKEY + ".e", "E Settings");
 			{
 				eMenu->set_assigned_texture(myhero->get_spell(spellslot::e)->get_icon_texture());
 				eMenu::comboTargets = eMenu->add_slider(BASEKEY + ".eComboTargets", "E in combo when x allies in range (0 to disable)", 3, 0, 5);
@@ -427,7 +429,7 @@ namespace sona {
 				eMenu::antiMeleeRange = eMenu->add_slider(BASEKEY + ".eAntiMeleeRange", "Anti Melee Range", 500, 100, 800);
 				eMenu::antiMeleeRange->set_tooltip("Auto E if Enemy in this range");
 			}
-			auto rMenu = main_tab->add_tab(BASEKEY + ".r", "R Settings");
+			auto rMenu = mainMenuTab->add_tab(BASEKEY + ".r", "R Settings");
 			{
 				
 				rMenu->set_assigned_texture(myhero->get_spell(spellslot::r)->get_icon_texture());
@@ -441,13 +443,15 @@ namespace sona {
 				rMenu::interrupt = rMenu->add_checkbox(BASEKEY + ".rInterrupt", "Use for Interrupt", true);
 
 			}
-			auto drawMenu = main_tab->add_tab(BASEKEY + ".drawings", "Drawings Settings");
+			auto drawMenu = mainMenuTab->add_tab(BASEKEY + ".drawings", "Drawings Settings");
 			{
-				drawMenu::draw_range_p = drawMenu->add_checkbox(BASEKEY + ".drawingP", "Draw Allies in Aura Range", true);
-				drawMenu::draw_range_q = drawMenu->add_checkbox(BASEKEY + ".drawingQ", "Draw Q range", true);
-				drawMenu::draw_range_w = drawMenu->add_checkbox(BASEKEY + ".drawingW", "Draw W range", true);
-				drawMenu::draw_range_e = drawMenu->add_checkbox(BASEKEY + ".drawingE", "Draw E range", true);
-				drawMenu::draw_range_r = drawMenu->add_checkbox(BASEKEY + ".drawingR", "Draw R range", true);
+				drawMenu::drawOnlyReady = drawMenu->add_checkbox(BASEKEY + ".drawingReady", "Draw Only Ready", true);
+				drawMenu::drawAuraTargets = drawMenu->add_checkbox(BASEKEY + ".drawingP", "Draw Allies in Aura Range", true);
+				drawMenu::drawRangeQ = drawMenu->add_checkbox(BASEKEY + ".drawingQ", "Draw Q range", true);
+				drawMenu::drawRangeW = drawMenu->add_checkbox(BASEKEY + ".drawingW", "Draw W range", true);
+				drawMenu::drawRangeE = drawMenu->add_checkbox(BASEKEY + ".drawingE", "Draw E range", true);
+				drawMenu::drawRangeR = drawMenu->add_checkbox(BASEKEY + ".drawingR", "Draw R range", true);
+
 				auto colorMenu = drawMenu->add_tab(BASEKEY + ".color", "Color Settings");
 				float pcolor[] = { 0.f, 1.f, 0.f, 1.f };
 				colorMenu::pColor = colorMenu->add_colorpick(BASEKEY + ".colorP", "Ally in Aura Color", pcolor);
