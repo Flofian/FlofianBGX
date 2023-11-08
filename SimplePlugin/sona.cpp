@@ -62,6 +62,7 @@ namespace sona {
 		TreeEntry* semiKey = nullptr;
 		TreeEntry* semiTargets = nullptr;
 		TreeEntry* interrupt = nullptr;
+		TreeEntry* hitchance = nullptr;
 	}
 
 	namespace drawMenu
@@ -72,8 +73,6 @@ namespace sona {
 		TreeEntry* drawRangeW = nullptr;
 		TreeEntry* drawRangeE = nullptr;
 		TreeEntry* drawRangeR = nullptr;
-
-		
 	}
 	namespace colorMenu
 	{
@@ -96,6 +95,20 @@ namespace sona {
 		if (!target || !target->is_valid()) return false;
 		bool inRange = target->get_distance(myhero->get_position())<passiveMenu::auraRange->get_int()+passiveMenu::useCenterEdge->get_bool()*target->get_bounding_radius();
 		return target && target->is_valid() && target->is_ally() && !target->is_dead() && target->is_visible() && target->is_targetable()&& inRange;
+	}
+	hit_chance getHitchance(const int hc)
+	{
+		switch (hc)
+		{
+		case 0:
+			return hit_chance::medium;
+		case 1:
+			return hit_chance::high;
+		case 2:
+			return hit_chance::very_high;
+		default:
+			return hit_chance::high;
+		}
 	}
 
 	// for Q
@@ -222,7 +235,7 @@ namespace sona {
 			for (const auto& target : entitylist->get_enemy_heroes()) {
 				if (target && target->is_valid() && target->is_visible() && !target->is_zombie() && target->is_valid_target(rMenu::range->get_int()) && target->is_casting_interruptible_spell() >= 2) {
 					auto pred = r->get_prediction(target, true);
-					if (pred.hitchance >= hit_chance::very_high) {
+					if (pred.hitchance >= getHitchance(rMenu::hitchance->get_int())) {
 						r->cast(pred.get_cast_position());
 						if (generalMenu::debugMode->get_bool()) myhero->print_chat(0, "Interrupt R on %i Targets with hitchance %i", pred.aoe_targets_hit_count(), pred.hitchance);
 					}
@@ -266,7 +279,7 @@ namespace sona {
 			auto target = target_selector->get_target(rMenu::range->get_int(), damage_type::magical);
 			if (!target) return;
 			auto pred = r->get_prediction(target, true);
-			if (pred.hitchance >= hit_chance::very_high && pred.aoe_targets_hit_count() >= rMenu::comboTargets->get_int()) {
+			if (pred.hitchance >= getHitchance(rMenu::hitchance->get_int()) && pred.aoe_targets_hit_count() >= rMenu::comboTargets->get_int()) {
 				auto castpos = pred.get_cast_position();
 				r->cast(castpos);
 				if (generalMenu::debugMode->get_bool()) myhero->print_chat(0, "Combo R on %i Targets with hitchance %i", pred.aoe_targets_hit_count(), pred.hitchance);
@@ -289,7 +302,7 @@ namespace sona {
 		auto target = target_selector->get_target(rMenu::range->get_int(), damage_type::magical);
 		if (!target) return;
 		auto pred = r->get_prediction(target, true);
-		if (pred.hitchance >= hit_chance::very_high && pred.aoe_targets_hit_count() >= rMenu::semiTargets->get_int()) {
+		if (pred.hitchance >= getHitchance(rMenu::hitchance->get_int()) && pred.aoe_targets_hit_count() >= rMenu::semiTargets->get_int()) {
 			auto castpos = pred.get_cast_position();
 			r->cast(castpos);
 			if (generalMenu::debugMode->get_bool()) myhero->print_chat(0, "Semi R on %i Targets with hitchance %i", pred.aoe_targets_hit_count(), pred.hitchance);
@@ -441,6 +454,7 @@ namespace sona {
 				rMenu::semiKey = rMenu->add_hotkey(BASEKEY + ".rSemiKey", "Semi Key", TreeHotkeyMode::Hold, 0x54, false);
 				rMenu::semiTargets = rMenu->add_slider(BASEKEY + ".rSemiTargets", "Min Targets for Semi Key", 2, 1, 5);
 				rMenu::interrupt = rMenu->add_checkbox(BASEKEY + ".rInterrupt", "Use for Interrupt", true);
+				rMenu::hitchance = rMenu->add_combobox(BASEKEY + ".rHitchance", "Hitchance", { {"Medium", nullptr},{"High", nullptr},{"Very High", nullptr} }, 1);
 
 			}
 			auto drawMenu = mainMenuTab->add_tab(BASEKEY + ".drawings", "Drawings Settings");
