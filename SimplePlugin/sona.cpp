@@ -10,6 +10,8 @@ namespace sona {
 	script_spell* r = nullptr;
 
 	script_spell* flash = nullptr;
+	bool adaptiveMana = false;
+	float manaPerc = 1;
 
 	TreeTab* main_tab = nullptr;
 
@@ -36,6 +38,7 @@ namespace sona {
 		TreeEntry* amplifyAA = nullptr;
 		TreeEntry* amplifyDirect = nullptr;
 		TreeEntry* autoMana = nullptr;
+		TreeEntry* sepAuto = nullptr;
 	}
 	
 	namespace wMenu
@@ -79,7 +82,36 @@ namespace sona {
 		TreeEntry* eColor = nullptr;
 		TreeEntry* rColor = nullptr;
 	}
+	// Helper functions ...
+	bool isUnderTower(const game_object_script& target)
+	{
+		for (const auto& turret : entitylist->get_enemy_turrets())
+			if (turret && turret->is_valid() && target->get_position().distance(turret->get_position()) <= 775 + target->get_bounding_radius()) //Should be 750, but i want small buffer
+				return true;
+		return false;
+	}
+	bool isAllyInAuraRange(const game_object_script& target)
+	{
+		if (!target || !target->is_valid()) return false;
+		bool inRange = target->get_distance(myhero->get_position())<passiveMenu::auraRange->get_int()+passiveMenu::useCenterEdge->get_bool()*target->get_bounding_radius();
+		return target && target->is_valid() && target->is_ally() && !target->is_dead() && target->is_visible() && target->is_targetable()&& inRange;
+	}
 
+	// for Q
+	bool canCastQ(bool isAuto) {
+		bool autoCheck = !isAuto || (myhero->get_mana_percent() > qMenu::autoMana->get_int() && 
+			(!generalMenu::recallCheck->get_bool() || !myhero->is_recalling()) && (!generalMenu::turretCheck->get_bool()||!isUnderTower(myhero)));
+		return q->is_ready() && autoCheck;
+	}
+	int countEnemiesInQRange() {
+		int count = 0;
+		for (const auto& target : entitylist->get_enemy_heroes()) {
+			if (target && target->is_valid() && target->is_valid_target(qMenu::range->get_int(), myhero->get_position())) count++;
+		}
+		return count;
+	}
+
+	// for W
 	float wShieldStrength(const game_object_script& target) {
 		//TODO Heal and shield power, mode specific buffs/nerf, revitalize, Spirit Visage
 		float baseShield = 5 + 20 * w->level() + 0.25f * myhero->get_total_ability_power();
@@ -90,48 +122,7 @@ namespace sona {
 		float baseHeal = 15 + 15 * w->level() + 0.15f * myhero->get_total_ability_power();
 		return baseHeal;
 	}
-
-	bool isUnderTower(const game_object_script& target)
-	{
-		for (const auto& turret : entitylist->get_enemy_turrets())
-			if (turret && turret->is_valid() && target->get_position().distance(turret->get_position()) <= 775 + target->get_bounding_radius()) //Should be 750, but i want small buffer
-				return true;
-		return false;
-	}
-
-	bool allyInAuraRange(const game_object_script& target)
-	{
-		if (!target || !target->is_valid()) return false;
-		bool inRange = target->get_distance(myhero->get_position())<passiveMenu::auraRange->get_int()+passiveMenu::useCenterEdge->get_bool()*target->get_bounding_radius();
-		return target && target->is_valid() && target->is_ally() && !target->is_dead() && target->is_visible() && target->is_targetable()&& inRange;
-	}
-	bool canCastQ(bool isAuto) {
-		bool autoCheck = !isAuto || (myhero->get_mana_percent() > qMenu::autoMana->get_int() && 
-			(!generalMenu::recallCheck->get_bool() || !myhero->is_recalling()) && (!generalMenu::turretCheck->get_bool()||!isUnderTower(myhero)));
-		return q->is_ready() && autoCheck;
-	}
-
-	bool isEnemyInERange(const game_object_script& target) {
-		int d = eMenu::antiMeleeRange->get_int();
-		for (const auto& enemy : entitylist->get_enemy_heroes()) {
-			if (enemy && enemy->is_valid()&&!enemy->is_dead()&& enemy->is_visible()){
-				if (target->get_distance(enemy) < d) return true;
-			}
-		}
-		return false;
-	}
-
-	bool canCastW() {
-		return w->is_ready() && (!generalMenu::recallCheck->get_bool() || !myhero->is_recalling());
-	}
-	int enemiesInQRange() {
-		int count = 0;
-		for (const auto& target : entitylist->get_enemy_heroes()) {
-			if (target && target->is_valid() && target->is_valid_target(qMenu::range->get_int(), myhero->get_position())) count++;
-		}
-		return count;
-	}
-	int countAlliesHealed() {
+	int countHealedChamps() {
 		bool selfHeal = false;
 		bool healAlly = false;
 		for (const auto& target : entitylist->get_ally_heroes()) {
@@ -146,12 +137,11 @@ namespace sona {
 		}
 		return selfHeal + healAlly;
 	}
-
-	int calcShieldedChamps() {
+	int countShieldedChamps() {
 		bool skillshots = wMenu::includeSkillshots->get_bool();
 		int total = 0;
 		for (const auto& target : entitylist->get_ally_heroes()) {
-			if (target && target->is_valid() && allyInAuraRange(target)) {
+			if (target && target->is_valid() && isAllyInAuraRange(target)) {
 				float incomingdmg = health_prediction->get_incoming_damage(target, 1.5f, skillshots);
 				float minDmgMitigated = 5 + 20 * w->level();		//Not sure about aram, since i shield less but might need to still mitigate same value to get passive stack
 				//so maybe: shieldabledmg = fmin(incomingdmg, wShieldStrength(target)) //and tweak wShieldStrength for aram/other modes
@@ -162,36 +152,48 @@ namespace sona {
 		return total;
 	}
 
+	// for E
+	bool isEnemyInERange(const game_object_script& target) {
+		int d = eMenu::antiMeleeRange->get_int();
+		for (const auto& enemy : entitylist->get_enemy_heroes()) {
+			if (enemy && enemy->is_valid()&&!enemy->is_dead()&& enemy->is_visible()){
+				if (target->get_distance(enemy) < d) return true;
+			}
+		}
+		return false;
+	}
+
+
 	void automatic() {
 		// Auto Q
 		if (canCastQ(true)) {
 			// Auto Q x Targets
-			int autoQTargets = qMenu::autoTargets->get_int();
-			if (autoQTargets > 0 && enemiesInQRange() >= autoQTargets) {
+			int autoQTargets = adaptiveMana ? 2*(manaPerc>40) : qMenu::autoTargets->get_int();		// 2 Targets when over 40% Mana, else disabled
+			if (autoQTargets > 0 && countEnemiesInQRange() >= autoQTargets) {
 				q->cast();
 			}
 			// Auto Q Amplify
-			if (qMenu::amplifyAA->get_bool()) {
-				int directHitsMin = qMenu::amplifyDirect->get_int();
+			if (adaptiveMana ? manaPerc>20 : qMenu::amplifyAA->get_bool()) {		// only amplify with more than 20% mana
+				int directHitsMin = adaptiveMana ? 1+(manaPerc<40) : qMenu::amplifyDirect->get_int();	// 1 direct hit when over 40 %, else 2
 				for (const auto& ally : entitylist->get_ally_heroes()) {
 					auto activeSpell = ally->get_active_spell();
 					
-					if (activeSpell && activeSpell->is_auto_attack() && !ally->is_winding_up() && allyInAuraRange(ally)) {
+					if (activeSpell && activeSpell->is_auto_attack() && !ally->is_winding_up() && isAllyInAuraRange(ally)) {
 						auto lastTargetId = activeSpell->get_last_target_id();
 						auto lastTarget = entitylist->get_object(lastTargetId);
 						
-						if (lastTarget && lastTarget->is_valid() && lastTarget->is_ai_hero() && enemiesInQRange() >= directHitsMin) q->cast();
+						if (lastTarget && lastTarget->is_valid() && lastTarget->is_ai_hero() && countEnemiesInQRange() >= directHitsMin) q->cast();
 					}
 				}
 			}
 		}
 
 		// Auto W
-		if (canCastW() && wMenu::autoShield->get_bool()) {
+		if (w->is_ready() && (!generalMenu::recallCheck->get_bool() || !myhero->is_recalling()) && wMenu::autoShield->get_bool()) {
 			int minHealTargets = wMenu::autoShieldHeal->get_int();
-			int totalShielded = calcShieldedChamps();
+			int totalShielded = countShieldedChamps();
 			//myhero->print_chat(0, "Heal: %i Shield: %i", countAlliesHealed(), totalShielded);
-			if (totalShielded >= wMenu::autoShieldFactor->get_int() && countAlliesHealed() >= minHealTargets) {
+			if (totalShielded >= wMenu::autoShieldFactor->get_int() && countHealedChamps() >= minHealTargets) {
 				w->cast();
 			}
 		}
@@ -204,7 +206,7 @@ namespace sona {
 				break;
 			case 2:
 				for (const auto& target : entitylist->get_ally_heroes()) {
-					if (allyInAuraRange(target) && isEnemyInERange(target)) { e->cast(); break; }
+					if (isAllyInAuraRange(target) && isEnemyInERange(target)) { e->cast(); break; }
 
 				}
 				break;
@@ -232,26 +234,27 @@ namespace sona {
 	void combo() {
 		// Q
 		if (canCastQ(false)) {
-			int minTargets = qMenu::comboTargets->get_int();
-			if (minTargets > 0 && enemiesInQRange() >= minTargets) {
+			int minTargets = adaptiveMana ? (2*(manaPerc>5) - manaPerc>=20) : qMenu::comboTargets->get_int(); // 0 if under 5%, 2 under 20%, else 1
+			if (minTargets > 0 && countEnemiesInQRange() >= minTargets) {
 				q->cast();
 			}
 		}
 
 		// W
 		if (w->is_ready()) {
+			float healUnderHP =  adaptiveMana ? manaPerc : wMenu::comboHealHP->get_int();
 			for (const auto& target : entitylist->get_ally_heroes()) {
-				if (target && target->is_valid() && target->get_health_percent() < wMenu::comboHealHP->get_int() && target->get_distance(myhero) < wMenu::range->get_int())
+				if (target && target->is_valid() && target->get_health_percent() < healUnderHP && target->get_distance(myhero) < wMenu::range->get_int())
 					w->cast();
 			}
 		}
 
 		// E
 		if (e->is_ready()) {
-			int minTargets = eMenu::comboTargets->get_int();
+			int minTargets =  adaptiveMana ? (4*(manaPerc>10)-manaPerc>30) : eMenu::comboTargets->get_int(); // 0 if under 10%, 4 if under 30%, else 3
 			int count = 0;
 			for (const auto& target : entitylist->get_ally_heroes()) {
-				if (target && target->is_valid() && !target->is_dead() && allyInAuraRange(target)) count++;
+				if (target && target->is_valid() && !target->is_dead() && isAllyInAuraRange(target)) count++;
 			}
 			if (minTargets>0 && count >= minTargets) e->cast();
 
@@ -273,8 +276,8 @@ namespace sona {
 	void harass() {
 		// Q
 		if (canCastQ(false)) {
-			int minTargets = qMenu::harassTargets->get_int();
-			if (minTargets > 0 && enemiesInQRange() >= minTargets) {
+			int minTargets = adaptiveMana ? (2 * (manaPerc > 5) - manaPerc >= 40) : qMenu::comboTargets->get_int(); // 0 if under 5%, 2 under 40%, else 1
+			if (minTargets > 0 && countEnemiesInQRange() >= minTargets) {
 				q->cast();
 			}
 		}
@@ -295,6 +298,8 @@ namespace sona {
 	void on_update() {
 		if (myhero->is_dead())
 			return;
+		adaptiveMana = generalMenu::adaptiveMana->get_bool();
+		manaPerc = myhero->get_mana_percent();
 		automatic();
 		if (orbwalker->combo_mode()) combo();
 		if (orbwalker->harass()) harass();
@@ -321,7 +326,7 @@ namespace sona {
 		if (drawMenu::draw_range_p->get_bool()) {
 			for (const auto& target : entitylist->get_ally_heroes()) {
 				if (target->is_me()) continue;
-				if (allyInAuraRange(target))
+				if (isAllyInAuraRange(target))
 					draw_manager->add_circle(target->get_position(), target->get_bounding_radius(), colorMenu::pColor->get_color());
 			}
 			
@@ -343,13 +348,44 @@ namespace sona {
 		main_tab->set_assigned_texture(myhero->get_square_icon_portrait());
 
 		// Menu init
-		{
+		{	
+			
 			auto generalMenu = main_tab->add_tab(BASEKEY + ".general", "General Settings");
 			{
 				generalMenu::recallCheck = generalMenu->add_checkbox(BASEKEY + ".gRecall", "Dont use anything automatically while recalling", true);
 				generalMenu::turretCheck = generalMenu->add_checkbox(BASEKEY + ".gTurret", "Dont use anything automatically under Enemy turret", true);
-				generalMenu::adaptiveMana = generalMenu->add_checkbox(BASEKEY + ".gAdaptiveMana", "Does nothing yet", true);
+				generalMenu::adaptiveMana = generalMenu->add_checkbox(BASEKEY + ".gAdaptiveMana", "Adaptive Mana Mode", false);
+				generalMenu::adaptiveMana->set_tooltip("This removes most of the sliders and instead uses your mana to calc the number of targets\n"
+														"To find the values used by Adaptive Mana Mode, disable it, then hover of the respective Sliders");
 				generalMenu::debugMode = generalMenu->add_checkbox(BASEKEY + ".debug", "Debug Mode", false);
+				generalMenu::adaptiveMana->add_property_change_callback([](TreeEntry* entry) {
+					if (entry->get_bool()) {
+						qMenu::comboTargets->is_hidden() = true;
+						qMenu::harassTargets->is_hidden() = true;
+						qMenu::autoTargets->is_hidden() = true;
+						qMenu::amplifyAA->is_hidden() = true;
+						qMenu::amplifyDirect->is_hidden() = true;
+						qMenu::autoMana->is_hidden() = true;
+						qMenu::sepAuto->is_hidden() = true;
+
+						wMenu::comboHealHP->is_hidden() = true;
+
+						eMenu::comboTargets->is_hidden() = true;
+					}
+					else {
+						qMenu::comboTargets->is_hidden() = false;
+						qMenu::harassTargets->is_hidden() = false;
+						qMenu::autoTargets->is_hidden() = false;
+						qMenu::amplifyAA->is_hidden() = false;
+						qMenu::amplifyDirect->is_hidden() = false;
+						qMenu::autoMana->is_hidden() = false;
+						qMenu::sepAuto->is_hidden() = false;
+
+						wMenu::comboHealHP->is_hidden() = false;
+
+						eMenu::comboTargets->is_hidden() = false;
+					}
+				});
 			}
 			auto passiveMenu = main_tab->add_tab(BASEKEY + ".passive", "Passive Settings");
 			{
@@ -362,11 +398,16 @@ namespace sona {
 				qMenu->set_assigned_texture(myhero->get_spell(spellslot::q)->get_icon_texture());
 				qMenu::range = qMenu->add_slider(BASEKEY + ".qRange", "Q Range", 800, 750, 825);
 				qMenu::comboTargets = qMenu->add_slider(BASEKEY + ".qComboTargets", "Min Targets in Combo (0 to disable)", 1, 0, 2);
+				qMenu::comboTargets->set_tooltip("Adaptive Mana:\nunder  5%: Disabled\nunder 20%: 2\nabove 20%: 1");
 				qMenu::harassTargets = qMenu->add_slider(BASEKEY + ".qHarassTargets", "Min Targets in Harass (0 to disable)", 1, 0, 2);
-				qMenu->add_separator(BASEKEY + ".qsep", "Automatic");
+				qMenu::harassTargets->set_tooltip("Adaptive Mana:\nunder  5%: Disabled\nunder 40%: 2\nabove 40%: 1");
+				qMenu::sepAuto = qMenu->add_separator(BASEKEY + ".qsep", "Automatic");
 				qMenu::autoTargets = qMenu->add_slider(BASEKEY + ".qAutoTargets", "Min Targets to Auto-use (0 to disable)", 2, 0, 2);
+				qMenu::autoTargets->set_tooltip("Adaptive Mana:\nunder 40%: Disabled\nabove 40%: 2");
 				qMenu::amplifyAA = qMenu->add_checkbox(BASEKEY + "qAmplifyAA", "Use to amplify autoattacks", true);
+				qMenu::amplifyAA->set_tooltip("Adaptive Mana:\nunder 20%: Disabled");
 				qMenu::amplifyDirect = qMenu->add_slider(BASEKEY + ".qAmplifyDirect", "^Only when also hitting x direct", 1, 0, 2);
+				qMenu::amplifyDirect->set_tooltip("Adaptive Mana:\nunder 20%: Disabled\nunder 40%: 2\nabove 40%: 1");
 				qMenu::autoMana = qMenu->add_slider(BASEKEY + "qAutoMana", "Only auto use when above x% mana", 30, 0, 100);
 			}
 			auto wMenu = main_tab->add_tab(BASEKEY + ".w", "W Settings");
@@ -374,7 +415,8 @@ namespace sona {
 				wMenu->set_assigned_texture(myhero->get_spell(spellslot::w)->get_icon_texture());
 				wMenu::range = wMenu->add_slider(BASEKEY + ".wRange", "W Range", 975, 950, 1000);
 				wMenu::comboHealHP = wMenu->add_slider(BASEKEY + ".wComboHealHP", "Use in combo if ally under x% HP", 60, 0, 100);
-				qMenu->add_separator(BASEKEY + ".wsep", "Automatic");
+				wMenu::comboHealHP->set_tooltip("Adaptive Mana:\nMana% = HP%\nExample: Mana at 50%-> Heal if ally under 50%HP");
+				wMenu->add_separator(BASEKEY + ".wsep", "Automatic");
 				wMenu::autoShield = wMenu->add_checkbox(BASEKEY + ".wAutoShield", "Shield Incoming Damage", true);
 				wMenu::autoShieldFactor = wMenu->add_slider(BASEKEY + ".wAutoShieldFactor", "Only when Shielding x Targets", 1, 1, 5);
 				wMenu::autoShieldFactor->set_tooltip("Depending on if you get a passive stack or not");
@@ -386,6 +428,7 @@ namespace sona {
 			{
 				eMenu->set_assigned_texture(myhero->get_spell(spellslot::e)->get_icon_texture());
 				eMenu::comboTargets = eMenu->add_slider(BASEKEY + ".eComboTargets", "E in combo when x allies in range (0 to disable)", 3, 0, 5);
+				eMenu::comboTargets->set_tooltip("Adaptive Mana:\nunder 10%: Disabled\nunder 30%: 4\nabove 30%: 3");
 				eMenu::antiMelee = eMenu->add_combobox(BASEKEY + ".eAntiMelee", "Anti Melee Mode", { {"Off", nullptr}, {"Self", nullptr}, {"Self + Ally", nullptr} }, 2);
 				eMenu::antiMeleeRange = eMenu->add_slider(BASEKEY + ".eAntiMeleeRange", "Anti Melee Range", 500, 100, 800);
 				eMenu::antiMeleeRange->set_tooltip("Auto E if Enemy in this range");
@@ -395,7 +438,6 @@ namespace sona {
 			{
 				
 				rMenu->set_assigned_texture(myhero->get_spell(spellslot::r)->get_icon_texture());
-				rMenu->set_tooltip("Currently does not use Bounding Radius");
 				rMenu::range = rMenu->add_slider(BASEKEY + ".rRange", "R Range", 950, 900, 1000);
 				rMenu::range->add_property_change_callback([](TreeEntry* entry) {
 					r->set_range(rMenu::range->get_int());
@@ -426,6 +468,23 @@ namespace sona {
 				colorMenu::eColor = colorMenu->add_colorpick(BASEKEY + ".colorE", "E Range Color", ecolor);
 				float rcolor[] = { 1.f, 1.f, 0.f, 1.f };
 				colorMenu::rColor = colorMenu->add_colorpick(BASEKEY + ".colorR", "R Range Color", rcolor);
+			}
+
+
+			// to set hidden on load when Adaptive Mana is still on
+			{
+				bool am = generalMenu::adaptiveMana->get_bool();
+				qMenu::comboTargets->is_hidden() = am;
+				qMenu::harassTargets->is_hidden() = am;
+				qMenu::autoTargets->is_hidden() = am;
+				qMenu::amplifyAA->is_hidden() = am;
+				qMenu::amplifyDirect->is_hidden() = am;
+				qMenu::autoMana->is_hidden() = am;
+				qMenu::sepAuto->is_hidden() = am;
+
+				wMenu::comboHealHP->is_hidden() = am;
+
+				eMenu::comboTargets->is_hidden() = am;
 			}
 		}
 		
