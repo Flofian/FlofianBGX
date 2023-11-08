@@ -1,7 +1,6 @@
 #include "../plugin_sdk/plugin_sdk.hpp"
 #include "sona.h"
 
-#define BASEKEY "Flofian."+myhero->get_model()
 
 namespace sona {
 	script_spell* q = nullptr;
@@ -360,20 +359,20 @@ namespace sona {
 		e = plugin_sdk->register_spell(spellslot::e, 0);
 		r = plugin_sdk->register_spell(spellslot::r, 950);
 		r->set_skillshot(0.25f, 140.0f, 2400.0f, { collisionable_objects::yasuo_wall }, skillshot_type::skillshot_line);
-		mainMenuTab = menu->create_tab(BASEKEY, "Flofian Sona");
+		mainMenuTab = menu->create_tab("Flofian_Sona", "Flofian Sona");
 		mainMenuTab->set_assigned_texture(myhero->get_square_icon_portrait());
 
 		// Menu init
 		{	
 			
-			auto generalMenu = mainMenuTab->add_tab(BASEKEY + ".general", "General Settings");
+			auto generalMenu = mainMenuTab->add_tab("General", "General Settings");
 			{
-				generalMenu::recallCheck = generalMenu->add_checkbox(BASEKEY + ".gRecall", "Dont use anything automatically while recalling", true);
-				generalMenu::turretCheck = generalMenu->add_checkbox(BASEKEY + ".gTurret", "Dont use anything automatically under Enemy turret", true);
-				generalMenu::adaptiveMana = generalMenu->add_checkbox(BASEKEY + ".gAdaptiveMana", "Adaptive Mana Mode", false);
+				generalMenu::recallCheck = generalMenu->add_checkbox("RecallCheck", "Dont use anything automatically while recalling", true);
+				generalMenu::turretCheck = generalMenu->add_checkbox("TurretCheck", "Dont use anything automatically under Enemy turret", true);
+				generalMenu::adaptiveMana = generalMenu->add_checkbox("AdaptiveMana", "Adaptive Mana Mode", true);
 				generalMenu::adaptiveMana->set_tooltip("This removes most of the sliders and instead uses your mana to calc the number of targets\n"
 														"To find the values used by Adaptive Mana Mode, disable it, then hover of the respective Sliders");
-				generalMenu::debugMode = generalMenu->add_checkbox(BASEKEY + ".debug", "Debug Mode", false);
+				generalMenu::debugMode = generalMenu->add_checkbox("Debug", "Debug Mode", false);
 				generalMenu::debugMode->is_hidden() = generalMenu::debugMode->get_bool();		// so only i have it on, dont want to hide it entirely
 				generalMenu::adaptiveMana->add_property_change_callback([](TreeEntry* entry) {
 					if (entry->get_bool()) {
@@ -404,87 +403,87 @@ namespace sona {
 					}
 				});
 			}
-			auto passiveMenu = mainMenuTab->add_tab(BASEKEY + ".passive", "Passive Settings");
+			auto passiveMenu = mainMenuTab->add_tab("Passive", "Passive Settings");
 			{
 				passiveMenu->set_assigned_texture(myhero->get_passive_icon_texture());
-				passiveMenu::auraRange = passiveMenu->add_slider(BASEKEY + ".pAuraRange", "Aura Range", 390, 350, 400);
-				passiveMenu::useCenterEdge = passiveMenu->add_checkbox(BASEKEY + ".pCenterEdge", "Use Center-Edge Range", true);
+				passiveMenu::auraRange = passiveMenu->add_slider("AuraRange", "Aura Range", 390, 350, 400);
+				passiveMenu::useCenterEdge = passiveMenu->add_checkbox("CenterEdge", "Use Center-Edge Range", true);
 			}
-			auto qMenu = mainMenuTab->add_tab(BASEKEY + ".q", "Q Settings");
+			auto qMenu = mainMenuTab->add_tab("Q", "Q Settings");
 			{
 				qMenu->set_assigned_texture(myhero->get_spell(spellslot::q)->get_icon_texture());
-				qMenu::range = qMenu->add_slider(BASEKEY + ".qRange", "Q Range", 800, 750, 825);
-				qMenu::comboTargets = qMenu->add_slider(BASEKEY + ".qComboTargets", "Min Targets in Combo (0 to disable)", 1, 0, 2);
+				qMenu::range = qMenu->add_slider("Range", "Q Range", 800, 750, 825);
+				qMenu::comboTargets = qMenu->add_slider("ComboTargets", "Min Targets in Combo (0 to disable)", 1, 0, 2);
 				qMenu::comboTargets->set_tooltip("Adaptive Mana:\nunder  5%: Disabled\nunder 20%: 2\nabove 20%: 1");
-				qMenu::harassTargets = qMenu->add_slider(BASEKEY + ".qHarassTargets", "Min Targets in Harass (0 to disable)", 1, 0, 2);
+				qMenu::harassTargets = qMenu->add_slider("HarassTargets", "Min Targets in Harass (0 to disable)", 1, 0, 2);
 				qMenu::harassTargets->set_tooltip("Adaptive Mana:\nunder  5%: Disabled\nunder 40%: 2\nabove 40%: 1");
-				qMenu::sepAuto = qMenu->add_separator(BASEKEY + ".qsep", "Automatic");
-				qMenu::autoTargets = qMenu->add_slider(BASEKEY + ".qAutoTargets", "Min Targets to Auto-use (0 to disable)", 2, 0, 2);
+				qMenu::sepAuto = qMenu->add_separator("sep", "Automatic");
+				qMenu::autoTargets = qMenu->add_slider("AutoTargets", "Min Targets to Auto-use (0 to disable)", 2, 0, 2);
 				qMenu::autoTargets->set_tooltip("Adaptive Mana:\nunder 40%: Disabled\nabove 40%: 2");
-				qMenu::amplifyAA = qMenu->add_checkbox(BASEKEY + "qAmplifyAA", "Use to amplify autoattacks", true);
+				qMenu::amplifyAA = qMenu->add_checkbox("AmplifyAA", "Use to amplify autoattacks", true);
 				qMenu::amplifyAA->set_tooltip("Adaptive Mana:\nunder 20%: Disabled");
-				qMenu::amplifyDirect = qMenu->add_slider(BASEKEY + ".qAmplifyDirect", "^Only when also hitting x direct", 1, 0, 2);
+				qMenu::amplifyDirect = qMenu->add_slider("AmplifyDirect", "^Only when also hitting x direct", 1, 0, 2);
 				qMenu::amplifyDirect->set_tooltip("Adaptive Mana:\nunder 20%: Disabled\nunder 40%: 2\nabove 40%: 1");
-				qMenu::autoMana = qMenu->add_slider(BASEKEY + "qAutoMana", "Only auto use when above x% mana", 30, 0, 100);
+				qMenu::autoMana = qMenu->add_slider("AutoMana", "Only auto use when above x% mana", 30, 0, 100);
 			}
-			auto wMenu = mainMenuTab->add_tab(BASEKEY + ".w", "W Settings");
+			auto wMenu = mainMenuTab->add_tab("W", "W Settings");
 			{
 				wMenu->set_assigned_texture(myhero->get_spell(spellslot::w)->get_icon_texture());
-				wMenu::range = wMenu->add_slider(BASEKEY + ".wRange", "W Range", 975, 950, 1000);
-				wMenu::comboHealHP = wMenu->add_slider(BASEKEY + ".wComboHealHP", "Use in combo if ally under x% HP", 60, 0, 100);
+				wMenu::range = wMenu->add_slider("Range", "W Range", 975, 950, 1000);
+				wMenu::comboHealHP = wMenu->add_slider("ComboHealHP", "Use in combo if ally under x% HP", 60, 0, 100);
 				wMenu::comboHealHP->set_tooltip("Adaptive Mana:\nMana% = HP%\nExample: Mana at 50%-> Heal if ally under 50%HP");
-				wMenu->add_separator(BASEKEY + ".wsep", "Automatic");
-				wMenu::autoShield = wMenu->add_checkbox(BASEKEY + ".wAutoShield", "Shield Incoming Damage", true);
-				wMenu::autoShieldFactor = wMenu->add_slider(BASEKEY + ".wAutoShieldFactor", "Only when Shielding x Targets", 1, 1, 5);
+				wMenu->add_separator("sep", "Automatic");
+				wMenu::autoShield = wMenu->add_checkbox("AutoShield", "Shield Incoming Damage", true);
+				wMenu::autoShieldFactor = wMenu->add_slider("AutoShieldFactor", "Only when Shielding x Targets", 1, 1, 5);
 				wMenu::autoShieldFactor->set_tooltip("Depending on if you get a passive stack or not");
-				wMenu::includeSkillshots = wMenu->add_checkbox(BASEKEY + ".wIncludeSkillshots", "Include Skillshots", true);
-				wMenu::autoShieldHeal = wMenu->add_slider(BASEKEY + ".wAutoShieldHeal", "Only when also healing x Targets", 1, 0, 2);
+				wMenu::includeSkillshots = wMenu->add_checkbox("IncludeSkillshots", "Include Skillshots", true);
+				wMenu::autoShieldHeal = wMenu->add_slider("AutoShieldHeal", "Only when also healing x Targets", 1, 0, 2);
 			}
-			auto eMenu = mainMenuTab->add_tab(BASEKEY + ".e", "E Settings");
+			auto eMenu = mainMenuTab->add_tab("E", "E Settings");
 			{
 				eMenu->set_assigned_texture(myhero->get_spell(spellslot::e)->get_icon_texture());
-				eMenu::comboTargets = eMenu->add_slider(BASEKEY + ".eComboTargets", "E in combo when x allies in range (0 to disable)", 3, 0, 5);
+				eMenu::comboTargets = eMenu->add_slider("ComboTargets", "E in combo when x allies in range (0 to disable)", 3, 0, 5);
 				eMenu::comboTargets->set_tooltip("Adaptive Mana:\nunder 10%: Disabled\nunder 30%: 4\nabove 30%: 3");
-				eMenu::antiMelee = eMenu->add_combobox(BASEKEY + ".eAntiMelee", "Anti Melee Mode", { {"Off", nullptr}, {"Self", nullptr}, {"Self + Ally", nullptr} }, 2);
-				eMenu::antiMeleeRange = eMenu->add_slider(BASEKEY + ".eAntiMeleeRange", "Anti Melee Range", 500, 100, 800);
+				eMenu::antiMelee = eMenu->add_combobox("AntiMelee", "Anti Melee Mode", { {"Off", nullptr}, {"Self", nullptr}, {"Self + Ally", nullptr} }, 2);
+				eMenu::antiMeleeRange = eMenu->add_slider("AntiMeleeRange", "Anti Melee Range", 500, 100, 800);
 				eMenu::antiMeleeRange->set_tooltip("Auto E if Enemy in this range");
 			}
-			auto rMenu = mainMenuTab->add_tab(BASEKEY + ".r", "R Settings");
+			auto rMenu = mainMenuTab->add_tab("R", "R Settings");
 			{
 				
 				rMenu->set_assigned_texture(myhero->get_spell(spellslot::r)->get_icon_texture());
-				rMenu::range = rMenu->add_slider(BASEKEY + ".rRange", "R Range", 950, 900, 1000);
+				rMenu::range = rMenu->add_slider("Range", "R Range", 950, 900, 1000);
 				rMenu::range->add_property_change_callback([](TreeEntry* entry) {
 					r->set_range(rMenu::range->get_int());
 					});
-				rMenu::comboTargets = rMenu->add_slider(BASEKEY + ".rComboTargets", "Min Targets in Combo (0 to disable)", 3, 0, 5);
-				rMenu::semiKey = rMenu->add_hotkey(BASEKEY + ".rSemiKey", "Semi Key", TreeHotkeyMode::Hold, 0x54, false);
-				rMenu::semiTargets = rMenu->add_slider(BASEKEY + ".rSemiTargets", "Min Targets for Semi Key", 2, 1, 5);
-				rMenu::interrupt = rMenu->add_checkbox(BASEKEY + ".rInterrupt", "Use for Interrupt", true);
-				rMenu::hitchance = rMenu->add_combobox(BASEKEY + ".rHitchance", "Hitchance", { {"Medium", nullptr},{"High", nullptr},{"Very High", nullptr} }, 1);
+				rMenu::comboTargets = rMenu->add_slider("ComboTargets", "Min Targets in Combo (0 to disable)", 3, 0, 5);
+				rMenu::semiKey = rMenu->add_hotkey("SemiKey", "Semi Key", TreeHotkeyMode::Hold, 0x54, false);
+				rMenu::semiTargets = rMenu->add_slider("SemiTargets", "Min Targets for Semi Key", 2, 1, 5);
+				rMenu::interrupt = rMenu->add_checkbox("Interrupt", "Use for Interrupt", true);
+				rMenu::hitchance = rMenu->add_combobox("Hitchance", "Hitchance", { {"Medium", nullptr},{"High", nullptr},{"Very High", nullptr} }, 1);
 
 			}
-			auto drawMenu = mainMenuTab->add_tab(BASEKEY + ".drawings", "Drawings Settings");
+			auto drawMenu = mainMenuTab->add_tab("drawings", "Drawings Settings");
 			{
-				drawMenu::drawOnlyReady = drawMenu->add_checkbox(BASEKEY + ".drawingReady", "Draw Only Ready", true);
-				drawMenu::drawAuraTargets = drawMenu->add_checkbox(BASEKEY + ".drawingP", "Draw Allies in Aura Range", true);
-				drawMenu::drawRangeQ = drawMenu->add_checkbox(BASEKEY + ".drawingQ", "Draw Q range", true);
-				drawMenu::drawRangeW = drawMenu->add_checkbox(BASEKEY + ".drawingW", "Draw W range", true);
-				drawMenu::drawRangeE = drawMenu->add_checkbox(BASEKEY + ".drawingE", "Draw E range", true);
-				drawMenu::drawRangeR = drawMenu->add_checkbox(BASEKEY + ".drawingR", "Draw R range", true);
+				drawMenu::drawOnlyReady = drawMenu->add_checkbox("drawReady", "Draw Only Ready", true);
+				drawMenu::drawAuraTargets = drawMenu->add_checkbox("drawP", "Draw Allies in Aura Range", true);
+				drawMenu::drawRangeQ = drawMenu->add_checkbox("drawQ", "Draw Q range", true);
+				drawMenu::drawRangeW = drawMenu->add_checkbox("drawW", "Draw W range", true);
+				drawMenu::drawRangeE = drawMenu->add_checkbox("drawE", "Draw E range", true);
+				drawMenu::drawRangeR = drawMenu->add_checkbox("drawR", "Draw R range", true);
 
-				auto colorMenu = drawMenu->add_tab(BASEKEY + ".color", "Color Settings");
+				auto colorMenu = drawMenu->add_tab("color", "Color Settings");
 				float pcolor[] = { 0.f, 1.f, 0.f, 1.f };
-				colorMenu::pColor = colorMenu->add_colorpick(BASEKEY + ".colorP", "Ally in Aura Color", pcolor);
+				colorMenu::pColor = colorMenu->add_colorpick("colorP", "Ally in Aura Color", pcolor);
 
 				float qcolor[] = { 0.f, 0.f, 1.f, 1.f };
-				colorMenu::qColor = colorMenu->add_colorpick(BASEKEY + ".colorQ", "Q Range Color", qcolor);
+				colorMenu::qColor = colorMenu->add_colorpick("colorQ", "Q Range Color", qcolor);
 				float wcolor[] = { 0.f, 1.f, 0.f, 1.f };
-				colorMenu::wColor = colorMenu->add_colorpick(BASEKEY + ".colorW", "W Range Color", wcolor);
+				colorMenu::wColor = colorMenu->add_colorpick("colorW", "W Range Color", wcolor);
 				float ecolor[] = { 1.f, 0.f, 1.f, 1.f };
-				colorMenu::eColor = colorMenu->add_colorpick(BASEKEY + ".colorE", "E Range Color", ecolor);
+				colorMenu::eColor = colorMenu->add_colorpick("colorE", "E Range Color", ecolor);
 				float rcolor[] = { 1.f, 1.f, 0.f, 1.f };
-				colorMenu::rColor = colorMenu->add_colorpick(BASEKEY + ".colorR", "R Range Color", rcolor);
+				colorMenu::rColor = colorMenu->add_colorpick("colorR", "R Range Color", rcolor);
 			}
 
 
