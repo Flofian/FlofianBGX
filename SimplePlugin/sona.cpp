@@ -238,7 +238,7 @@ namespace sona {
 		if (r->is_ready() && (!generalMenu::recallCheck->get_bool() || !myhero->is_recalling()) && rMenu::interrupt->get_bool()) {
 			for (const auto& target : entitylist->get_enemy_heroes()) {
 				if (target && target->is_valid() && target->is_visible() && !target->is_zombie() && target->is_valid_target(rMenu::range->get_int()) && target->is_casting_interruptible_spell() >= 2) {
-					auto pred = r->get_prediction(target, true, -1, { collisionable_objects::yasuo_wall });
+					auto pred = r->get_prediction(target, true);
 					if (pred.hitchance >= getHitchance(rMenu::hitchance->get_int())) {
 						r->cast(pred.get_cast_position());
 						if (generalMenu::debugMode->get_bool()) myhero->print_chat(0, "Interrupt R on %i Targets with hitchance %i", pred.aoe_targets_hit_count(), pred.hitchance);
@@ -282,7 +282,7 @@ namespace sona {
 		if (r->is_ready()) {
 			auto target = target_selector->get_target(rMenu::range->get_int(), damage_type::magical);
 			if (!target) return;
-			auto pred = r->get_prediction(target, true, -1, { collisionable_objects::yasuo_wall });
+			auto pred = r->get_prediction(target, true);
 			if (pred.hitchance >= getHitchance(rMenu::hitchance->get_int()) && pred.aoe_targets_hit_count() >= rMenu::comboTargets->get_int()) {
 				auto castpos = pred.get_cast_position();
 				r->cast(castpos);
@@ -305,7 +305,7 @@ namespace sona {
 		if (myhero->is_dead() || !rMenu::semiKey->get_bool() || !r->is_ready()) return;
 		auto target = target_selector->get_target(rMenu::range->get_int(), damage_type::magical);
 		if (!target) return;
-		auto pred = r->get_prediction(target, true, -1, {collisionable_objects::yasuo_wall});
+		auto pred = r->get_prediction(target, true);
 		if (pred.hitchance >= getHitchance(rMenu::hitchance->get_int()) && pred.aoe_targets_hit_count() >= rMenu::semiTargets->get_int()) {
 			auto castpos = pred.get_cast_position();
 			r->cast(castpos);
