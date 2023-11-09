@@ -508,7 +508,6 @@ namespace sona {
 		event_handler<events::on_update>::add_callback(on_update);
 		
 		if (missioninfo->get_map_id() == game_map_id::HowlingAbyss) isAram = true;
-		console->print("aram: %i", isAram);
 
 	}
 	void unload()
