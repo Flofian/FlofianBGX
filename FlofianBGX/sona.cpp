@@ -407,6 +407,35 @@ namespace sona {
 		}
 	}
 	
+	void updateMenuAdaptiveMana(bool adaptiveMana) {
+		if (adaptiveMana) {
+			qMenu::comboTargets->set_display_name("[Disabled by Adaptive Mana] Combo Targets");
+			qMenu::harassTargets->set_display_name("[Disabled by Adaptive Mana] Harass Targets");
+			qMenu::autoTargets->set_display_name("[Disabled by Adaptive Mana] Auto Targets");
+			qMenu::amplifyAA->set_display_name("[Disabled by Adaptive Mana] Amplify AutoAttacks");
+			qMenu::amplifyDirect->set_display_name("[Disabled by Adaptive Mana] Amplify Direct Hits");
+			qMenu::autoMana->is_hidden() = true;
+			qMenu::sepAuto->is_hidden() = true;
+
+			wMenu::comboHealHP->set_display_name("[Disabled by Adaptive Mana] Combo Heal under x% HP");
+
+			eMenu::comboTargets->set_display_name("[Disabled by Adaptive Mana] Combo Allies");
+
+		}
+		else {
+			qMenu::comboTargets->set_display_name("Min Targets in Combo (0 to disable)");
+			qMenu::harassTargets->set_display_name("Min Targets in Combo (0 to disable)");
+			qMenu::autoTargets->set_display_name("Min Targets to Auto-use (0 to disable)");
+			qMenu::amplifyAA->set_display_name("Use to amplify AutoAttacks");
+			qMenu::amplifyDirect->set_display_name("^Only when also hitting x direct");
+			qMenu::autoMana->is_hidden() = false;
+			qMenu::sepAuto->is_hidden() = false;
+
+			wMenu::comboHealHP->set_display_name("Use in combo if ally under x% HP");
+
+			eMenu::comboTargets->set_display_name("E in combo when x allies in range (0 to disable)");
+		}
+	}
 
 	void load() {
 		q = plugin_sdk->register_spell(spellslot::q, 825);
@@ -426,36 +455,11 @@ namespace sona {
 				generalMenu::turretCheck = generalMenu->add_checkbox("TurretCheck", "Dont use anything automatically under Enemy turret", true);
 				generalMenu::adaptiveMana = generalMenu->add_checkbox("AdaptiveMana", "Adaptive Mana Mode", true);
 				generalMenu::adaptiveMana->set_tooltip("This removes most of the sliders and instead uses your mana to calc the number of targets\n"
-														"To find the values used by Adaptive Mana Mode, disable it, then hover of the respective Sliders");
+														"To find the values used by Adaptive Mana Mode, hover over the respective Sliders");
 				generalMenu::debugMode = generalMenu->add_checkbox("Debug", "Debug Mode", false);
 				generalMenu::debugMode->is_hidden() = generalMenu::debugMode->get_bool();		// so only i have it on, dont want to hide it entirely
 				generalMenu::adaptiveMana->add_property_change_callback([](TreeEntry* entry) {
-					if (entry->get_bool()) {
-						qMenu::comboTargets->is_hidden() = true;
-						qMenu::harassTargets->is_hidden() = true;
-						qMenu::autoTargets->is_hidden() = true;
-						qMenu::amplifyAA->is_hidden() = true;
-						qMenu::amplifyDirect->is_hidden() = true;
-						qMenu::autoMana->is_hidden() = true;
-						qMenu::sepAuto->is_hidden() = true;
-
-						wMenu::comboHealHP->is_hidden() = true;
-
-						eMenu::comboTargets->is_hidden() = true;
-					}
-					else {
-						qMenu::comboTargets->is_hidden() = false;
-						qMenu::harassTargets->is_hidden() = false;
-						qMenu::autoTargets->is_hidden() = false;
-						qMenu::amplifyAA->is_hidden() = false;
-						qMenu::amplifyDirect->is_hidden() = false;
-						qMenu::autoMana->is_hidden() = false;
-						qMenu::sepAuto->is_hidden() = false;
-
-						wMenu::comboHealHP->is_hidden() = false;
-
-						eMenu::comboTargets->is_hidden() = false;
-					}
+					updateMenuAdaptiveMana(entry->get_bool());
 				});
 			}
 			auto passiveMenu = mainMenuTab->add_tab("Passive", "Passive Settings");
@@ -472,7 +476,7 @@ namespace sona {
 				qMenu::comboTargets = qMenu->add_slider("ComboTargets", "Min Targets in Combo (0 to disable)", 1, 0, 2);
 				qMenu::comboTargets->set_tooltip("Adaptive Mana:\nunder  5%: Disabled\nunder 20%: 2\nabove 20%: 1");
 
-				qMenu::harassTargets = qMenu->add_slider("HarassTargets", "Min Targets in Harass (0 to disable)", 1, 0, 2);
+				qMenu::harassTargets = qMenu->add_slider("HarassTargets", "Min Targets in Combo (0 to disable)", 1, 0, 2);
 				qMenu::harassTargets->set_tooltip("Adaptive Mana:\nunder  5%: Disabled\nunder 40%: 2\nabove 40%: 1");
 
 				qMenu::sepAuto = qMenu->add_separator("sep", "Automatic");
@@ -564,17 +568,7 @@ namespace sona {
 			// to set hidden on load when Adaptive Mana is still on
 			{
 				bool am = generalMenu::adaptiveMana->get_bool();
-				qMenu::comboTargets->is_hidden() = am;
-				qMenu::harassTargets->is_hidden() = am;
-				qMenu::autoTargets->is_hidden() = am;
-				qMenu::amplifyAA->is_hidden() = am;
-				qMenu::amplifyDirect->is_hidden() = am;
-				qMenu::autoMana->is_hidden() = am;
-				qMenu::sepAuto->is_hidden() = am;
-
-				wMenu::comboHealHP->is_hidden() = am;
-
-				eMenu::comboTargets->is_hidden() = am;
+				updateMenuAdaptiveMana(am);
 			}
 		}
 		
