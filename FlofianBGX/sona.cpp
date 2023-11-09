@@ -120,39 +120,9 @@ namespace sona {
 		}
 	}
 	void updateTear() {
-		tearItem = spellslot::invalid;
-		for (int i = 11; i >= 6; i--)
-		{
-			auto item = myhero->get_item((spellslot)i);
-			if (!item) continue;
-
-			switch (item->get_item_id())
-			{
-			case (int)ItemId::Tear_of_the_Goddess:
-				tearItem = (spellslot)i;
-				break;
-			case (int)ItemId::Archangels_Staff:
-				tearItem = (spellslot)i;
-				break;
-			case (int)ItemId::Archangels_Staff_Arena:
-				tearItem = (spellslot)i;
-				break;
-			case (int)ItemId::Manamune:
-				tearItem = (spellslot)i;
-				break;
-			case (int)ItemId::Manamune_Arena:
-				tearItem = (spellslot)i;
-				break;
-			case (int)ItemId::Winters_Approach:
-				tearItem = (spellslot)i;
-				break;
-			case (int)ItemId::Winters_Approach_Arena:
-				tearItem = (spellslot)i;
-				break;
-			default: 
-				break;
-			}
-		}
+		tearItem = myhero->has_item({ ItemId::Tear_of_the_Goddess, ItemId::Archangels_Staff, ItemId::Archangels_Staff_Arena, 
+			ItemId::Manamune, ItemId::Manamune_Arena, ItemId::Winters_Approach, ItemId::Winters_Approach_Arena });
+		//should hopefully work the same
 	}
 
 	// for Q
