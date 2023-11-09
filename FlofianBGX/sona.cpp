@@ -507,11 +507,8 @@ namespace sona {
 		event_handler<events::on_draw>::add_callback(on_draw);
 		event_handler<events::on_update>::add_callback(on_update);
 		
-		for (const auto& buff : myhero->get_bufflist())
-		{
-			if (!buff || !buff->is_valid()) continue;
-			if (buff->get_hash_name() == buff_hash("HowlingAbyssAura")) isAram = true;
-		}
+		if (missioninfo->get_map_id() == game_map_id::HowlingAbyss) isAram = true;
+		console->print("aram: %i", isAram);
 
 	}
 	void unload()
