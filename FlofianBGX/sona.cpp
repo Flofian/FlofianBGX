@@ -15,6 +15,8 @@ namespace sona {
 	bool hasAery = false;
 	bool hasManaflowband = false;
 
+	spellslot tearItem = spellslot::invalid;
+
 	TreeTab* mainMenuTab = nullptr;
 
 	namespace generalMenu
@@ -43,6 +45,7 @@ namespace sona {
 		TreeEntry* sepAuto = nullptr;
 		TreeEntry* waitAeryComet = nullptr;
 		TreeEntry* waitManaflowband = nullptr;
+		TreeEntry* waitTear = nullptr;
 	}
 	
 	namespace wMenu
@@ -116,6 +119,41 @@ namespace sona {
 			return hit_chance::high;
 		}
 	}
+	void updateTear() {
+		tearItem = spellslot::invalid;
+		for (int i = 11; i >= 6; i--)
+		{
+			auto item = myhero->get_item((spellslot)i);
+			if (!item) continue;
+
+			switch (item->get_item_id())
+			{
+			case (int)ItemId::Tear_of_the_Goddess:
+				tearItem = (spellslot)i;
+				break;
+			case (int)ItemId::Archangels_Staff:
+				tearItem = (spellslot)i;
+				break;
+			case (int)ItemId::Archangels_Staff_Arena:
+				tearItem = (spellslot)i;
+				break;
+			case (int)ItemId::Manamune:
+				tearItem = (spellslot)i;
+				break;
+			case (int)ItemId::Manamune_Arena:
+				tearItem = (spellslot)i;
+				break;
+			case (int)ItemId::Winters_Approach:
+				tearItem = (spellslot)i;
+				break;
+			case (int)ItemId::Winters_Approach_Arena:
+				tearItem = (spellslot)i;
+				break;
+			default: 
+				break;
+			}
+		}
+	}
 
 	// for Q
 	bool checkRunesReady() {
@@ -148,10 +186,11 @@ namespace sona {
 		bool recallCheck = !generalMenu::recallCheck->get_bool() || !myhero->is_recalling();
 		bool turretCheck = !generalMenu::turretCheck->get_bool() || !isUnderTower(myhero);
 		bool manaCheck = myhero->get_mana_percent() > qMenu::autoMana->get_int() || adaptiveMana;
-		
+		bool tearCheck = !qMenu::waitTear->get_bool() || tearItem == spellslot::invalid || myhero->get_spell(tearItem)->cooldown() <= 0;
+						// Dont check OR dont have OR is ready
 
 
-		bool autoCheck = !isAuto || (manaCheck && recallCheck && turretCheck && checkRunesReady());
+		bool autoCheck = !isAuto || (manaCheck && recallCheck && turretCheck && tearCheck && checkRunesReady());
 		return q->is_ready() && autoCheck;
 	}
 	int countEnemiesInQRange() {
@@ -351,6 +390,7 @@ namespace sona {
 	}
 	
 	void on_update() {
+		updateTear();
 		if (myhero->is_dead())
 			return;
 		adaptiveMana = generalMenu::adaptiveMana->get_bool();
@@ -474,6 +514,9 @@ namespace sona {
 
 				qMenu::waitManaflowband = qMenu->add_checkbox("WaitManaflowband", "Only Auto Q if Manaflowband ready", false);
 				qMenu::waitManaflowband->set_tooltip("Gets ignored if you dont have it or have it fully stacked already");
+
+				qMenu::waitTear = qMenu->add_checkbox("WaitTear", "Only Auto Q if Tear ready", false);
+				qMenu::waitTear->set_tooltip("Gets ignored if you dont have a tear item or have it evolved, but i cant check for fully stacked");
 			}
 			auto wMenu = mainMenuTab->add_tab("W", "W Settings");
 			{
