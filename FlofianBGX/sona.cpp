@@ -11,6 +11,9 @@ namespace sona {
 	bool adaptiveMana = false;
 	float manaPerc = 1;
 	bool isAram = false;
+	bool hasComet = false;
+	bool hasAery = false;
+	bool hasManaflowband = false;
 
 	TreeTab* mainMenuTab = nullptr;
 
@@ -38,6 +41,8 @@ namespace sona {
 		TreeEntry* amplifyDirect = nullptr;
 		TreeEntry* autoMana = nullptr;
 		TreeEntry* sepAuto = nullptr;
+		TreeEntry* waitAeryComet = nullptr;
+		TreeEntry* waitManaflowband = nullptr;
 	}
 	
 	namespace wMenu
@@ -113,9 +118,40 @@ namespace sona {
 	}
 
 	// for Q
+	bool checkRunesReady() {
+		bool aeryReady = !hasAery;		// so if i dont have it i ignore it
+		bool cometReady = !hasComet;
+		bool manaflowbandReady = true;	// always true except if i find the cooldown debuff
+		for (const auto& buff : myhero->get_bufflist())
+		{
+			if (!buff || !buff->is_valid()) continue;
+			switch (buff->get_hash_name())
+			{
+			case buff_hash("ASSETS/Perks/Styles/Sorcery/SummonAery/SummonAery.lua"):
+				aeryReady = true;
+				break;
+			case buff_hash("ASSETS/Perks/Styles/Sorcery/ArcaneComet/ArcaneCometSnipe.lua"):
+				cometReady = true;
+				break;
+			case buff_hash("ASSETS/Perks/Styles/Sorcery/PotentialEnergy/PerkSorceryOutOfCombatCooldownBuff.lua"):	
+				//not really sure why that is its name, cant find anything else though
+				manaflowbandReady = false;
+				break;
+			default:
+				break;
+			}
+		}
+		// Either i dont check or it has to be ready
+		return (!qMenu::waitAeryComet->get_bool() || (aeryReady && cometReady))&&(!qMenu::waitManaflowband->get_bool()||manaflowbandReady);
+	}
 	bool canCastQ(bool isAuto) {
-		bool autoCheck = !isAuto || (myhero->get_mana_percent() > qMenu::autoMana->get_int() && 
-			(!generalMenu::recallCheck->get_bool() || !myhero->is_recalling()) && (!generalMenu::turretCheck->get_bool()||!isUnderTower(myhero)));
+		bool recallCheck = !generalMenu::recallCheck->get_bool() || !myhero->is_recalling();
+		bool turretCheck = !generalMenu::turretCheck->get_bool() || !isUnderTower(myhero);
+		bool manaCheck = myhero->get_mana_percent() > qMenu::autoMana->get_int() || adaptiveMana;
+		
+
+
+		bool autoCheck = !isAuto || (manaCheck && recallCheck && turretCheck && checkRunesReady());
 		return q->is_ready() && autoCheck;
 	}
 	int countEnemiesInQRange() {
@@ -413,18 +449,31 @@ namespace sona {
 			{
 				qMenu->set_assigned_texture(myhero->get_spell(spellslot::q)->get_icon_texture());
 				qMenu::range = qMenu->add_slider("Range", "Q Range", 800, 750, 825);
+
 				qMenu::comboTargets = qMenu->add_slider("ComboTargets", "Min Targets in Combo (0 to disable)", 1, 0, 2);
 				qMenu::comboTargets->set_tooltip("Adaptive Mana:\nunder  5%: Disabled\nunder 20%: 2\nabove 20%: 1");
+
 				qMenu::harassTargets = qMenu->add_slider("HarassTargets", "Min Targets in Harass (0 to disable)", 1, 0, 2);
 				qMenu::harassTargets->set_tooltip("Adaptive Mana:\nunder  5%: Disabled\nunder 40%: 2\nabove 40%: 1");
+
 				qMenu::sepAuto = qMenu->add_separator("sep", "Automatic");
+
 				qMenu::autoTargets = qMenu->add_slider("AutoTargets", "Min Targets to Auto-use (0 to disable)", 2, 0, 2);
 				qMenu::autoTargets->set_tooltip("Adaptive Mana:\nunder 40%: Disabled\nabove 40%: 2");
+
 				qMenu::amplifyAA = qMenu->add_checkbox("AmplifyAA", "Use to amplify autoattacks", true);
 				qMenu::amplifyAA->set_tooltip("Adaptive Mana:\nunder 20%: Disabled");
+
 				qMenu::amplifyDirect = qMenu->add_slider("AmplifyDirect", "^Only when also hitting x direct", 1, 0, 2);
 				qMenu::amplifyDirect->set_tooltip("Adaptive Mana:\nunder 20%: Disabled\nunder 40%: 2\nabove 40%: 1");
+
 				qMenu::autoMana = qMenu->add_slider("AutoMana", "Only auto use when above x% mana", 30, 0, 100);
+				
+				qMenu::waitAeryComet = qMenu->add_checkbox("WaitAeryComet", "Only Auto Q if Aery/Comet ready", false);
+				qMenu::waitAeryComet->set_tooltip("Gets ignored if you dont have those runes");
+
+				qMenu::waitManaflowband = qMenu->add_checkbox("WaitManaflowband", "Only Auto Q if Manaflowband ready", false);
+				qMenu::waitManaflowband->set_tooltip("Gets ignored if you dont have it or have it fully stacked already");
 			}
 			auto wMenu = mainMenuTab->add_tab("W", "W Settings");
 			{
@@ -508,6 +557,10 @@ namespace sona {
 		event_handler<events::on_update>::add_callback(on_update);
 		
 		if (missioninfo->get_map_id() == game_map_id::HowlingAbyss) isAram = true;
+		hasAery = myhero->has_perk(8214);
+		hasComet = myhero->has_perk(8229);
+		hasManaflowband = myhero->has_perk(8226);
+		// find these in datadragon/{patch}/data/{lang}/runesReforged.json, but shouldnt update near future i think?
 
 	}
 	void unload()
