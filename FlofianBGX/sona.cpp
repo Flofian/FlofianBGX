@@ -41,6 +41,7 @@ namespace sona {
 		TreeEntry* autoTargets = nullptr;
 		TreeEntry* amplifyAA = nullptr;
 		TreeEntry* amplifyDirect = nullptr;
+		TreeEntry* removeSpellshields = nullptr;
 		TreeEntry* autoMana = nullptr;
 		TreeEntry* sepAuto = nullptr;
 		TreeEntry* waitAeryComet = nullptr;
@@ -246,6 +247,14 @@ namespace sona {
 						auto lastTarget = entitylist->get_object(lastTargetId);
 						
 						if (lastTarget && lastTarget->is_valid() && lastTarget->is_ai_hero() && countEnemiesInQRange() >= directHitsMin) q->cast();
+					}
+				}
+			}
+			// Auto Q Remove Spellshields
+			if (qMenu::removeSpellshields->get_bool()) {
+				for (const auto& target : entitylist->get_enemy_heroes()) {
+					if (target && target->is_valid() && target->is_targetable() && target->get_position().distance(myhero) < qMenu::range->get_int()) {
+						if (target->has_buff({ buff_hash("bansheesveil"),  buff_hash("itemmagekillerveil"), buff_hash("malzaharpassiveshield") })) q->cast();
 					}
 				}
 			}
@@ -476,6 +485,9 @@ namespace sona {
 
 				qMenu::amplifyDirect = qMenu->add_slider("AmplifyDirect", "^Only when also hitting x direct", 1, 0, 2);
 				qMenu::amplifyDirect->set_tooltip("Adaptive Mana:\nunder 20%: Disabled\nunder 40%: 2\nabove 40%: 1");
+
+				qMenu::removeSpellshields = qMenu->add_checkbox("removeSpellshields", "Auto Q to remove Spellshields", true);
+				qMenu::removeSpellshields->set_tooltip("Doesnt include Sivir E because i dont want to heal her");
 
 				qMenu::autoMana = qMenu->add_slider("AutoMana", "Only auto use when above x% mana", 30, 0, 100);
 				
