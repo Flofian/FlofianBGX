@@ -414,7 +414,7 @@ namespace sona {
 		}
 		else {
 			qMenu::comboTargets->set_display_name("Min Targets in Combo (0 to disable)");
-			qMenu::harassTargets->set_display_name("Min Targets in Combo (0 to disable)");
+			qMenu::harassTargets->set_display_name("Min Targets in Harass (0 to disable)");
 			qMenu::autoTargets->set_display_name("Min Targets to Auto-use (0 to disable)");
 			qMenu::amplifyAA->set_display_name("Use to amplify AutoAttacks");
 			qMenu::amplifyDirect->set_display_name("^Only when also hitting x direct");
