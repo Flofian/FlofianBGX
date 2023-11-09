@@ -72,6 +72,7 @@ namespace sona {
 		TreeEntry* semiTargets = nullptr;
 		TreeEntry* interrupt = nullptr;
 		TreeEntry* hitchance = nullptr;
+		TreeEntry* useExperimentalPred = nullptr;
 	}
 
 	namespace drawMenu
@@ -529,7 +530,7 @@ namespace sona {
 				rMenu::semiTargets = rMenu->add_slider("SemiTargets", "Min Targets for Semi Key", 2, 1, 5);
 				rMenu::interrupt = rMenu->add_checkbox("Interrupt", "Use for Interrupt", true);
 				rMenu::hitchance = rMenu->add_combobox("Hitchance", "Hitchance", { {"Medium", nullptr},{"High", nullptr},{"Very High", nullptr} }, 1);
-
+				rMenu::useExperimentalPred = rMenu->add_checkbox("customPred", "Use custom Prediction", true);
 			}
 			auto drawMenu = mainMenuTab->add_tab("drawings", "Drawings Settings");
 			{
