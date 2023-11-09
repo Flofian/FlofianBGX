@@ -97,7 +97,7 @@ namespace sona {
 	{
 		if (!target || !target->is_valid()) return false;
 		bool inRange = target->get_distance(myhero->get_position())<passiveMenu::auraRange->get_int()+passiveMenu::useCenterEdge->get_bool()*target->get_bounding_radius();
-		return target && target->is_valid() && target->is_ally() && !target->is_dead() && target->is_visible() && target->is_targetable()&& inRange;
+		return target->is_ally() && !target->is_dead() && target->is_visible() && target->is_targetable()&& inRange;
 	}
 	hit_chance getHitchance(const int hc)
 	{
@@ -116,7 +116,6 @@ namespace sona {
 	void updateTear() {
 		tearItem = myhero->has_item({ ItemId::Tear_of_the_Goddess, ItemId::Archangels_Staff, ItemId::Archangels_Staff_Arena, 
 			ItemId::Manamune, ItemId::Manamune_Arena, ItemId::Winters_Approach, ItemId::Winters_Approach_Arena });
-		//should hopefully work the same
 	}
 
 	// for Q
@@ -136,7 +135,7 @@ namespace sona {
 				cometReady = true;
 				break;
 			case buff_hash("ASSETS/Perks/Styles/Sorcery/PotentialEnergy/PerkSorceryOutOfCombatCooldownBuff.lua"):	
-				//not really sure why that is its name, cant find anything else though
+				//not really sure why that is its name, but confirmed via practice tool
 				manaflowbandReady = false;
 				break;
 			default:
@@ -167,7 +166,7 @@ namespace sona {
 
 	// for W
 	float wShieldStrength(const game_object_script& target) {
-		//TODO Heal and shield power, mode specific buffs/nerf, revitalize, Spirit Visage
+		//TODO Heal and shield power, mode specific buffs/nerf, revitalize, Spirit Visage, maybe serpents fang debuff?
 		float baseShield = 5 + 20 * w->level() + 0.25f * myhero->get_total_ability_power();
 		return baseShield;
 	}
@@ -200,11 +199,9 @@ namespace sona {
 		for (const auto& target : entitylist->get_ally_heroes()) {
 			if (target && target->is_valid() && isAllyInAuraRange(target)) {
 				float incomingdmg = health_prediction->get_incoming_damage(target, 1.5f, skillshots);
-				float minDmgMitigated = 5 + 20 * w->level();		//Not sure about aram, since i shield less but might need to still mitigate same value to get passive stack
-				//so maybe: shieldabledmg = fmin(incomingdmg, wShieldStrength(target)) //and tweak wShieldStrength for aram/other modes
+				float minDmgMitigated = 5 + 20 * w->level();
 				if (incomingdmg > minDmgMitigated) total++;
 			}
-
 		}
 		return total;
 	}
@@ -450,7 +447,7 @@ namespace sona {
 				generalMenu::adaptiveMana->set_tooltip("This removes most of the sliders and instead uses your mana to calc the number of targets\n"
 														"To find the values used by Adaptive Mana Mode, hover over the respective Sliders");
 				generalMenu::debugMode = generalMenu->add_checkbox("Debug", "Debug Mode", false);
-				generalMenu::debugMode->is_hidden() = generalMenu::debugMode->get_bool();		// so only i have it on, dont want to hide it entirely
+				generalMenu::debugMode->is_hidden() = true;		// so only i have it on, dont want to remove it entirely
 				generalMenu::adaptiveMana->add_property_change_callback([](TreeEntry* entry) {
 					updateMenuAdaptiveMana(entry->get_bool());
 				});
