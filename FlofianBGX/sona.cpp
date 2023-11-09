@@ -93,13 +93,6 @@ namespace sona {
 	}
 
 	// Helper functions
-	bool isUnderTower(const game_object_script& target)
-	{
-		for (const auto& turret : entitylist->get_enemy_turrets())
-			if (turret && turret->is_valid() && target->get_position().distance(turret->get_position()) <= 775 + target->get_bounding_radius()) //Should be 750, but i want small buffer
-				return true;
-		return false;
-	}
 	bool isAllyInAuraRange(const game_object_script& target)
 	{
 		if (!target || !target->is_valid()) return false;
@@ -155,7 +148,7 @@ namespace sona {
 	}
 	bool canCastQ(bool isAuto) {
 		bool recallCheck = !generalMenu::recallCheck->get_bool() || !myhero->is_recalling();
-		bool turretCheck = !generalMenu::turretCheck->get_bool() || !isUnderTower(myhero);
+		bool turretCheck = !generalMenu::turretCheck->get_bool() || !myhero->is_under_enemy_turret();
 		bool manaCheck = myhero->get_mana_percent() > qMenu::autoMana->get_int() || adaptiveMana;
 		bool tearCheck = !qMenu::waitTear->get_bool() || tearItem == spellslot::invalid || myhero->get_spell(tearItem)->cooldown() <= 0;
 						// Dont check OR dont have OR is ready
