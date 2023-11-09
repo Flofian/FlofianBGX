@@ -73,6 +73,7 @@ namespace sona {
 		TreeEntry* interrupt = nullptr;
 		TreeEntry* hitchance = nullptr;
 		TreeEntry* useExperimentalPred = nullptr;
+		TreeEntry* useBoundingBox = nullptr;
 	}
 
 	namespace drawMenu
@@ -218,6 +219,32 @@ namespace sona {
 		return false;
 	}
 
+	// for R
+	int countRHits(const vector targetpos) {
+		// using bounding box is right (tested), but i still want the option to turn it off
+		if (rMenu::useBoundingBox->get_bool()) {
+			int counter = 0;
+			for (const game_object_script& enemy : entitylist->get_enemy_heroes()) {
+				if (enemy->is_dead() || enemy->is_zombie() || !enemy->is_visible() || enemy->get_is_cc_immune() || enemy->get_position().distance(myhero) > 1200) continue;	// check for even further away in case he walks into it
+				auto rect = geometry::rectangle(myhero->get_position(), myhero->get_position() + ((targetpos - myhero->get_position()).normalized() * r->range()), 140.f + enemy->get_bounding_radius()).to_polygon();
+				auto pred = r->get_prediction(enemy);
+				if (rect.is_inside(pred.get_unit_position()) && pred.hitchance >= getHitchance(rMenu::hitchance->get_int())) counter++;
+			}
+			return counter;
+		}
+		else {
+			int counter = 0;
+			auto rect = geometry::rectangle(myhero->get_position(), myhero->get_position() + ((targetpos - myhero->get_position()).normalized() * r->range()), 140.f).to_polygon();
+			for (const game_object_script& enemy : entitylist->get_enemy_heroes()) {
+				if (enemy->is_dead() || enemy->is_zombie() || !enemy->is_visible() || enemy->get_is_cc_immune() || enemy->get_position().distance(myhero) > 1200) continue;
+				auto pred = r->get_prediction(enemy);
+				if (rect.is_inside(pred.get_unit_position()) && pred.hitchance >= getHitchance(rMenu::hitchance->get_int())) counter++;
+			}
+			return counter;
+		}
+		
+	}
+	//void customRWrapper(int mintargets)
 
 	void automatic() {
 		// Auto Q
@@ -281,7 +308,7 @@ namespace sona {
 		// R interrupt
 		if (r->is_ready() && (!generalMenu::recallCheck->get_bool() || !myhero->is_recalling()) && rMenu::interrupt->get_bool()) {
 			for (const auto& target : entitylist->get_enemy_heroes()) {
-				if (target && target->is_valid() && target->is_visible() && !target->is_zombie() && target->is_valid_target(rMenu::range->get_int()) && target->is_casting_interruptible_spell() >= 2) {
+				if (target && target->is_valid() && target->is_visible() && !target->is_zombie() && target->is_valid_target(rMenu::range->get_int()) && target->is_casting_interruptible_spell() >= 2 && !target->get_is_cc_immune()) {
 					auto pred = r->get_prediction(target, true);
 					if (pred.hitchance >= getHitchance(rMenu::hitchance->get_int())) {
 						r->cast(pred.get_cast_position());
@@ -324,14 +351,37 @@ namespace sona {
 
 		// R 
 		if (r->is_ready()) {
-			auto target = target_selector->get_target(rMenu::range->get_int(), damage_type::magical);
-			if (!target) return;
 			int minTargets = rMenu::comboTargets->get_int();
-			auto pred = r->get_prediction(target, minTargets>1);
-			if (pred.hitchance >= getHitchance(rMenu::hitchance->get_int()) && (minTargets == 1 || pred.aoe_targets_hit_count() >= rMenu::comboTargets->get_int())) {
-				auto castpos = pred.get_cast_position();
-				r->cast(castpos);
-				if (generalMenu::debugMode->get_bool()) myhero->print_chat(0, "Combo R on %i Targets with hitchance %i", minTargets > 1 ? pred.aoe_targets_hit_count() : 1, pred.hitchance);
+			if (!rMenu::useExperimentalPred->get_bool()){
+				// old logic
+				auto target = target_selector->get_target(rMenu::range->get_int(), damage_type::magical);
+				if (!target) return;
+				auto pred = r->get_prediction(target, minTargets>1);
+				if (pred.hitchance >= getHitchance(rMenu::hitchance->get_int()) && (minTargets == 1 || pred.aoe_targets_hit_count() >= rMenu::comboTargets->get_int())) {
+					auto castpos = pred.get_cast_position();
+					r->cast(castpos);
+					if (generalMenu::debugMode->get_bool()) myhero->print_chat(0, "Combo R on %i Targets with hitchance %i", minTargets > 1 ? pred.aoe_targets_hit_count() : 1, pred.hitchance);
+				}
+			}
+			else {
+				auto selectedTarget = target_selector->get_selected_target();
+				if (selectedTarget && selectedTarget->is_valid()) {
+					int targets = countRHits(selectedTarget->get_position());
+					if (selectedTarget->is_visible() && !selectedTarget->is_zombie() && !selectedTarget->get_is_cc_immune() && targets >= minTargets) {
+						r->cast(selectedTarget);
+						if (generalMenu::debugMode->get_bool()) myhero->print_chat(0, "Combo R on %i Targets with selected %s", targets, selectedTarget->get_model_cstr());
+					}
+				}
+				else {
+					for (const auto& target : entitylist->get_enemy_heroes()) {
+						int targets = countRHits(target->get_position());
+						if (targets >= minTargets) {
+							r->cast(target);
+							if (generalMenu::debugMode->get_bool()) myhero->print_chat(0, "Combo R on %i Targets",targets);
+						}
+
+					}
+				}
 			}
 		}
 	}
@@ -347,15 +397,38 @@ namespace sona {
 	}
 
 	void semiR() {
+		// Holy shit thats a lot of redundant code
 		if (myhero->is_dead() || !rMenu::semiKey->get_bool() || !r->is_ready()) return;
-		auto target = target_selector->get_target(rMenu::range->get_int(), damage_type::magical);
-		if (!target) return;
 		int minTargets = rMenu::semiTargets->get_int();
-		auto pred = r->get_prediction(target, minTargets>1);
-		if (pred.hitchance >= getHitchance(rMenu::hitchance->get_int()) && (minTargets == 1 || pred.aoe_targets_hit_count() >= rMenu::semiTargets->get_int())) {
-			auto castpos = pred.get_cast_position();
-			r->cast(castpos);
-			if (generalMenu::debugMode->get_bool()) myhero->print_chat(0, "Semi R on %i Targets with hitchance %i", minTargets>1 ? pred.aoe_targets_hit_count() : 1, pred.hitchance);
+		if (!rMenu::useExperimentalPred->get_bool()) {
+			auto target = target_selector->get_target(rMenu::range->get_int(), damage_type::magical);
+			if (!target) return;
+			auto pred = r->get_prediction(target, minTargets > 1);
+			if (pred.hitchance >= getHitchance(rMenu::hitchance->get_int()) && (minTargets == 1 || pred.aoe_targets_hit_count() >= minTargets)) {
+				auto castpos = pred.get_cast_position();
+				r->cast(castpos);
+				if (generalMenu::debugMode->get_bool()) myhero->print_chat(0, "Semi R on %i Targets with hitchance %i", minTargets > 1 ? pred.aoe_targets_hit_count() : 1, pred.hitchance);
+			}
+		}
+		else {
+			auto selectedTarget = target_selector->get_selected_target();
+			if (selectedTarget && selectedTarget->is_valid()) {
+				int targets = countRHits(selectedTarget->get_position());
+				if (selectedTarget->is_visible() && !selectedTarget->is_zombie() && !selectedTarget->get_is_cc_immune() && targets >= minTargets) {
+					r->cast(selectedTarget);
+					if (generalMenu::debugMode->get_bool()) myhero->print_chat(0, "Semi R on %i Targets with selected %s", targets, selectedTarget->get_model_cstr());
+				}
+			}
+			else {
+				for (const auto& target : entitylist->get_enemy_heroes()) {
+					int targets = countRHits(target->get_position());
+					if (targets >= minTargets) {
+						r->cast(target);
+						if (generalMenu::debugMode->get_bool()) myhero->print_chat(0, "Semi R on %i Targets", targets);
+					}
+
+				}
+			}
 		}
 	}
 	
@@ -531,6 +604,8 @@ namespace sona {
 				rMenu::interrupt = rMenu->add_checkbox("Interrupt", "Use for Interrupt", true);
 				rMenu::hitchance = rMenu->add_combobox("Hitchance", "Hitchance", { {"Medium", nullptr},{"High", nullptr},{"Very High", nullptr} }, 1);
 				rMenu::useExperimentalPred = rMenu->add_checkbox("customPred", "Use custom Prediction", true);
+				rMenu::useBoundingBox = rMenu->add_checkbox("useBoundingBox", "DEBUG Use bounding box", true);
+				//rMenu::useBoundingBox->is_hidden() = true;		// hide for now, remove completely for merge
 			}
 			auto drawMenu = mainMenuTab->add_tab("drawings", "Drawings Settings");
 			{
