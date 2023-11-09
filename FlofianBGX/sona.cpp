@@ -409,17 +409,17 @@ namespace sona {
 	
 	void updateMenuAdaptiveMana(bool adaptiveMana) {
 		if (adaptiveMana) {
-			qMenu::comboTargets->set_display_name("[Disabled by Adaptive Mana] Combo Targets");
-			qMenu::harassTargets->set_display_name("[Disabled by Adaptive Mana] Harass Targets");
-			qMenu::autoTargets->set_display_name("[Disabled by Adaptive Mana] Auto Targets");
-			qMenu::amplifyAA->set_display_name("[Disabled by Adaptive Mana] Amplify AutoAttacks");
-			qMenu::amplifyDirect->set_display_name("[Disabled by Adaptive Mana] Amplify Direct Hits");
+			qMenu::comboTargets->set_display_name("[Replaced by Adaptive Mana] Combo Targets");
+			qMenu::harassTargets->set_display_name("[Replaced by Adaptive Mana] Harass Targets");
+			qMenu::autoTargets->set_display_name("[Replaced by Adaptive Mana] Auto Targets");
+			qMenu::amplifyAA->set_display_name("[Replaced by Adaptive Mana] Amplify AutoAttacks");
+			qMenu::amplifyDirect->set_display_name("[Replaced by Adaptive Mana] Amplify Direct Hits");
 			qMenu::autoMana->is_hidden() = true;
 			qMenu::sepAuto->is_hidden() = true;
 
-			wMenu::comboHealHP->set_display_name("[Disabled by Adaptive Mana] Combo Heal under x% HP");
+			wMenu::comboHealHP->set_display_name("[Replaced by Adaptive Mana] Combo Heal under x% HP");
 
-			eMenu::comboTargets->set_display_name("[Disabled by Adaptive Mana] Combo Allies");
+			eMenu::comboTargets->set_display_name("[Replaced by Adaptive Mana] Combo Allies");
 
 		}
 		else {
