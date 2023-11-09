@@ -244,7 +244,40 @@ namespace sona {
 		}
 		
 	}
-	//void customRWrapper(int mintargets)
+	void customRWrapper(int minTargets, int debugid) {
+		auto debugstr = debugid == 1 ? "Semi " : "Combo ";
+		if (!rMenu::useExperimentalPred->get_bool()) {
+			// old logic
+			auto target = target_selector->get_target(rMenu::range->get_int(), damage_type::magical);
+			if (!target) return;
+			auto pred = r->get_prediction(target, minTargets > 1);
+			if (pred.hitchance >= getHitchance(rMenu::hitchance->get_int()) && (minTargets == 1 || pred.aoe_targets_hit_count() >= minTargets)) {
+				auto castpos = pred.get_cast_position();
+				r->cast(castpos);
+				if (generalMenu::debugMode->get_bool()) myhero->print_chat(0, "%s R on %i Targets with hitchance %i", debugstr, minTargets > 1 ? pred.aoe_targets_hit_count() : 1, pred.hitchance);
+			}
+		}
+		else {
+			auto selectedTarget = target_selector->get_selected_target();
+			if (selectedTarget && selectedTarget->is_valid()) {
+				int targets = countRHits(selectedTarget->get_position());
+				if (selectedTarget->is_visible() && !selectedTarget->is_zombie() && !selectedTarget->get_is_cc_immune() && targets >= minTargets) {
+					r->cast(selectedTarget);
+					if (generalMenu::debugMode->get_bool()) myhero->print_chat(0, "%s R on %i Targets with selected %s", debugstr, targets, selectedTarget->get_model_cstr());
+				}
+			}
+			else {
+				for (const auto& target : entitylist->get_enemy_heroes()) {
+					int targets = countRHits(target->get_position());
+					if (targets >= minTargets) {
+						r->cast(target);
+						if (generalMenu::debugMode->get_bool()) myhero->print_chat(0, "%s R on %i Targets", debugstr, targets);
+					}
+
+				}
+			}
+		}
+	}
 
 	void automatic() {
 		// Auto Q
@@ -351,38 +384,7 @@ namespace sona {
 
 		// R 
 		if (r->is_ready()) {
-			int minTargets = rMenu::comboTargets->get_int();
-			if (!rMenu::useExperimentalPred->get_bool()){
-				// old logic
-				auto target = target_selector->get_target(rMenu::range->get_int(), damage_type::magical);
-				if (!target) return;
-				auto pred = r->get_prediction(target, minTargets>1);
-				if (pred.hitchance >= getHitchance(rMenu::hitchance->get_int()) && (minTargets == 1 || pred.aoe_targets_hit_count() >= rMenu::comboTargets->get_int())) {
-					auto castpos = pred.get_cast_position();
-					r->cast(castpos);
-					if (generalMenu::debugMode->get_bool()) myhero->print_chat(0, "Combo R on %i Targets with hitchance %i", minTargets > 1 ? pred.aoe_targets_hit_count() : 1, pred.hitchance);
-				}
-			}
-			else {
-				auto selectedTarget = target_selector->get_selected_target();
-				if (selectedTarget && selectedTarget->is_valid()) {
-					int targets = countRHits(selectedTarget->get_position());
-					if (selectedTarget->is_visible() && !selectedTarget->is_zombie() && !selectedTarget->get_is_cc_immune() && targets >= minTargets) {
-						r->cast(selectedTarget);
-						if (generalMenu::debugMode->get_bool()) myhero->print_chat(0, "Combo R on %i Targets with selected %s", targets, selectedTarget->get_model_cstr());
-					}
-				}
-				else {
-					for (const auto& target : entitylist->get_enemy_heroes()) {
-						int targets = countRHits(target->get_position());
-						if (targets >= minTargets) {
-							r->cast(target);
-							if (generalMenu::debugMode->get_bool()) myhero->print_chat(0, "Combo R on %i Targets",targets);
-						}
-
-					}
-				}
-			}
+			customRWrapper(rMenu::comboTargets->get_int(),0);
 		}
 	}
 
@@ -397,39 +399,8 @@ namespace sona {
 	}
 
 	void semiR() {
-		// Holy shit thats a lot of redundant code
 		if (myhero->is_dead() || !rMenu::semiKey->get_bool() || !r->is_ready()) return;
-		int minTargets = rMenu::semiTargets->get_int();
-		if (!rMenu::useExperimentalPred->get_bool()) {
-			auto target = target_selector->get_target(rMenu::range->get_int(), damage_type::magical);
-			if (!target) return;
-			auto pred = r->get_prediction(target, minTargets > 1);
-			if (pred.hitchance >= getHitchance(rMenu::hitchance->get_int()) && (minTargets == 1 || pred.aoe_targets_hit_count() >= minTargets)) {
-				auto castpos = pred.get_cast_position();
-				r->cast(castpos);
-				if (generalMenu::debugMode->get_bool()) myhero->print_chat(0, "Semi R on %i Targets with hitchance %i", minTargets > 1 ? pred.aoe_targets_hit_count() : 1, pred.hitchance);
-			}
-		}
-		else {
-			auto selectedTarget = target_selector->get_selected_target();
-			if (selectedTarget && selectedTarget->is_valid()) {
-				int targets = countRHits(selectedTarget->get_position());
-				if (selectedTarget->is_visible() && !selectedTarget->is_zombie() && !selectedTarget->get_is_cc_immune() && targets >= minTargets) {
-					r->cast(selectedTarget);
-					if (generalMenu::debugMode->get_bool()) myhero->print_chat(0, "Semi R on %i Targets with selected %s", targets, selectedTarget->get_model_cstr());
-				}
-			}
-			else {
-				for (const auto& target : entitylist->get_enemy_heroes()) {
-					int targets = countRHits(target->get_position());
-					if (targets >= minTargets) {
-						r->cast(target);
-						if (generalMenu::debugMode->get_bool()) myhero->print_chat(0, "Semi R on %i Targets", targets);
-					}
-
-				}
-			}
-		}
+		customRWrapper(rMenu::semiTargets->get_int(), 1);
 	}
 	
 	void on_update() {
