@@ -74,6 +74,7 @@ namespace sona {
 		TreeEntry* hitchance = nullptr;
 		TreeEntry* useExperimentalPred = nullptr;
 		TreeEntry* useBoundingBox = nullptr;
+		TreeEntry* ignoreSemiHitcount = nullptr;
 	}
 
 	namespace drawMenu
@@ -244,8 +245,8 @@ namespace sona {
 		}
 		
 	}
-	void customRWrapper(int minTargets, int debugid) {
-		auto debugstr = debugid == 1 ? "Semi " : "Combo ";
+	void customRWrapper(int minTargets, int mode) {
+		auto debugstr = mode == 1 ? "Semi " : "Combo ";
 		if (!rMenu::useExperimentalPred->get_bool()) {
 			// old logic
 			auto target = target_selector->get_target(rMenu::range->get_int(), damage_type::magical);
@@ -260,8 +261,9 @@ namespace sona {
 		else {
 			auto selectedTarget = target_selector->get_selected_target();
 			if (selectedTarget && selectedTarget->is_valid()) {
+				bool ignoreHitcount = rMenu::ignoreSemiHitcount->get_bool() && mode == 1;
 				int targets = countRHits(selectedTarget->get_position());
-				if (selectedTarget->is_visible() && !selectedTarget->is_zombie() && !selectedTarget->get_is_cc_immune() && targets >= minTargets) {
+				if (selectedTarget->is_visible() && !selectedTarget->is_zombie() && !selectedTarget->get_is_cc_immune() && (targets >= minTargets || ignoreHitcount)) {
 					r->cast(selectedTarget);
 					if (generalMenu::debugMode->get_bool()) myhero->print_chat(0, "%s R on %i Targets with selected %s", debugstr, targets, selectedTarget->get_model_cstr());
 				}
@@ -577,6 +579,8 @@ namespace sona {
 				rMenu::useExperimentalPred = rMenu->add_checkbox("customPred", "Use custom Prediction", true);
 				rMenu::useBoundingBox = rMenu->add_checkbox("useBoundingBox", "DEBUG Use bounding box", true);
 				rMenu::useBoundingBox->is_hidden() = true;		// hide for now
+				rMenu::ignoreSemiHitcount = rMenu->add_checkbox("ignoreSemiHits", "Ignore Hitcount for Semi R if target selected", true);
+				rMenu::ignoreSemiHitcount->set_tooltip("If you click on someone to force that target (red circle under them), ignore how many it can hit");
 			}
 			auto drawMenu = mainMenuTab->add_tab("drawings", "Drawings Settings");
 			{
