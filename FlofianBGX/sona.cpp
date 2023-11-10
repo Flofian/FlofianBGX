@@ -1,5 +1,6 @@
 #include "../plugin_sdk/plugin_sdk.hpp"
 #include "sona.h"
+#include "../spelldb/SpellDB.h"
 
 
 namespace sona {
@@ -75,6 +76,7 @@ namespace sona {
 		TreeEntry* useExperimentalPred = nullptr;
 		TreeEntry* useBoundingBox = nullptr;
 		TreeEntry* ignoreSemiHitcount = nullptr;
+		TreeTab* spelldb = nullptr;
 	}
 
 	namespace drawMenu
@@ -343,7 +345,7 @@ namespace sona {
 		// R interrupt
 		if (r->is_ready() && (!generalMenu::recallCheck->get_bool() || !myhero->is_recalling()) && rMenu::interrupt->get_bool()) {
 			for (const auto& target : entitylist->get_enemy_heroes()) {
-				if (target && target->is_valid() && target->is_visible() && !target->is_zombie() && target->is_valid_target(rMenu::range->get_int()) && target->is_casting_interruptible_spell() >= 2 && !target->get_is_cc_immune()) {
+				if (target && target->is_valid() && target->is_visible() && !target->is_zombie() && target->is_valid_target(rMenu::range->get_int()) && Database::canCancel(target) && !target->get_is_cc_immune()) {
 					auto pred = r->get_prediction(target, true);
 					if (pred.hitchance >= getHitchance(rMenu::hitchance->get_int())) {
 						r->cast(pred.get_cast_position());
@@ -571,16 +573,18 @@ namespace sona {
 				rMenu::range->add_property_change_callback([](TreeEntry* entry) {
 					r->set_range(rMenu::range->get_int());
 					});
+				rMenu::useExperimentalPred = rMenu->add_checkbox("customPred", "Use custom Prediction", true);
+				rMenu::hitchance = rMenu->add_combobox("Hitchance", "Hitchance", { {"Medium", nullptr},{"High", nullptr},{"Very High", nullptr} }, 1);
 				rMenu::comboTargets = rMenu->add_slider("ComboTargets", "Min Targets in Combo (0 to disable)", 3, 0, 5);
 				rMenu::semiKey = rMenu->add_hotkey("SemiKey", "Semi Key", TreeHotkeyMode::Hold, 0x54, false);
 				rMenu::semiTargets = rMenu->add_slider("SemiTargets", "Min Targets for Semi Key", 2, 1, 5);
-				rMenu::interrupt = rMenu->add_checkbox("Interrupt", "Use for Interrupt", true);
-				rMenu::hitchance = rMenu->add_combobox("Hitchance", "Hitchance", { {"Medium", nullptr},{"High", nullptr},{"Very High", nullptr} }, 1);
-				rMenu::useExperimentalPred = rMenu->add_checkbox("customPred", "Use custom Prediction", true);
 				rMenu::useBoundingBox = rMenu->add_checkbox("useBoundingBox", "DEBUG Use bounding box", true);
 				rMenu::useBoundingBox->is_hidden() = true;		// hide for now
 				rMenu::ignoreSemiHitcount = rMenu->add_checkbox("ignoreSemiHits", "Ignore Hitcount for Semi R if target selected", true);
 				rMenu::ignoreSemiHitcount->set_tooltip("If you click on someone to force that target (red circle under them), ignore how many it can hit");
+				rMenu::interrupt = rMenu->add_checkbox("Interrupt", "Use for Interrupt", true);
+				rMenu::spelldb = rMenu->add_tab("interruptdb", "Interrupt Database");
+				Database::InitializeCancelMenu(rMenu::spelldb);
 			}
 			auto drawMenu = mainMenuTab->add_tab("drawings", "Drawings Settings");
 			{

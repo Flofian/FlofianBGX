@@ -8,6 +8,9 @@
     <Filter Include="plugin_sdk">
       <UniqueIdentifier>{bd2578a1-3ff5-40ed-adbc-4679e687d14c}</UniqueIdentifier>
     </Filter>
+    <Filter Include="spelldb">
+      <UniqueIdentifier>{338b1e63-3ec7-4909-bbe2-3cf7fd5a9e3a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -22,6 +25,9 @@
     <ClCompile Include="sona.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="..\spelldb\SpellDB.cpp">
+      <Filter>spelldb</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\plugin_sdk\cpplinq.h">
@@ -35,6 +41,9 @@
     </ClInclude>
     <ClInclude Include="sona.h">
       <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\spelldb\SpellDB.h">
+      <Filter>spelldb</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
