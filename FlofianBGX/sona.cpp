@@ -576,7 +576,7 @@ namespace sona {
 				rMenu::hitchance = rMenu->add_combobox("Hitchance", "Hitchance", { {"Medium", nullptr},{"High", nullptr},{"Very High", nullptr} }, 1);
 				rMenu::useExperimentalPred = rMenu->add_checkbox("customPred", "Use custom Prediction", true);
 				rMenu::useBoundingBox = rMenu->add_checkbox("useBoundingBox", "DEBUG Use bounding box", true);
-				rMenu::useBoundingBox->is_hidden() = true;		// hide for now, remove completely for merge
+				rMenu::useBoundingBox->is_hidden() = true;		// hide for now, set to true by default in future
 			}
 			auto drawMenu = mainMenuTab->add_tab("drawings", "Drawings Settings");
 			{
