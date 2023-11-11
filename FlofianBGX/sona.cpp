@@ -4,7 +4,7 @@
 
 
 namespace sona {
-	std::string VERSION = "1.3.1";
+	std::string VERSION = "1.3.2";
 	script_spell* q = nullptr;
 	script_spell* w = nullptr;
 	script_spell* e = nullptr;
@@ -263,10 +263,10 @@ namespace sona {
 		}
 		else {
 			auto selectedTarget = target_selector->get_selected_target();
-			if (selectedTarget && selectedTarget->is_valid()) {
+			if (selectedTarget && selectedTarget->is_valid() && selectedTarget->get_distance(myhero) < r->range()) {
 				bool ignoreHitcount = rMenu::ignoreSemiHitcount->get_bool() && mode == 1;
 				int targets = countRHits(selectedTarget->get_position());
-				if (selectedTarget->is_visible() && !selectedTarget->is_zombie() && !selectedTarget->is_dead() && !selectedTarget->get_is_cc_immune() && (targets >= minTargets || ignoreHitcount)) {
+				if (selectedTarget->is_visible() && !selectedTarget->is_zombie() && !selectedTarget->is_dead() && selectedTarget->is_targetable() && !selectedTarget->get_is_cc_immune() && (targets >= minTargets || (ignoreHitcount && targets>=1))) {
 					r->cast(selectedTarget);
 					if (generalMenu::debugMode->get_bool()) myhero->print_chat(0, "%s R on %i Targets with selected %s", debugstr, targets, selectedTarget->get_model_cstr());
 				}
