@@ -4,6 +4,7 @@
 
 
 namespace sona {
+	std::string VERSION = "1.3.1";
 	script_spell* q = nullptr;
 	script_spell* w = nullptr;
 	script_spell* e = nullptr;
@@ -265,7 +266,7 @@ namespace sona {
 			if (selectedTarget && selectedTarget->is_valid()) {
 				bool ignoreHitcount = rMenu::ignoreSemiHitcount->get_bool() && mode == 1;
 				int targets = countRHits(selectedTarget->get_position());
-				if (selectedTarget->is_visible() && !selectedTarget->is_zombie() && !selectedTarget->get_is_cc_immune() && (targets >= minTargets || ignoreHitcount)) {
+				if (selectedTarget->is_visible() && !selectedTarget->is_zombie() && !selectedTarget->is_dead() && !selectedTarget->get_is_cc_immune() && (targets >= minTargets || ignoreHitcount)) {
 					r->cast(selectedTarget);
 					if (generalMenu::debugMode->get_bool()) myhero->print_chat(0, "%s R on %i Targets with selected %s", debugstr, targets, selectedTarget->get_model_cstr());
 				}
@@ -309,7 +310,7 @@ namespace sona {
 			if (qMenu::removeSpellshields->get_bool()) {
 				for (const auto& target : entitylist->get_enemy_heroes()) {
 					if (target && target->is_valid() && target->is_targetable() && target->get_position().distance(myhero) < qMenu::range->get_int()) {
-						if (target->has_buff({ buff_hash("bansheesveil"),  buff_hash("itemmagekillerveil"), buff_hash("malzaharpassiveshield") })) q->cast();
+						if (target->has_buff({ buff_hash("bansheesveil"),  buff_hash("itemmagekillerveil"), buff_hash("malzaharpassiveshield"), buff_hash("ASSETS/Perks/Styles/Inspiration/FirstStrike/FirstStrikeAvailable.lua")})) q->cast();
 					}
 				}
 			}
@@ -454,7 +455,6 @@ namespace sona {
 			qMenu::amplifyAA->set_display_name("[Replaced by Adaptive Mana] Amplify AutoAttacks");
 			qMenu::amplifyDirect->set_display_name("[Replaced by Adaptive Mana] Amplify Direct Hits");
 			qMenu::autoMana->is_hidden() = true;
-			qMenu::sepAuto->is_hidden() = true;
 
 			wMenu::comboHealHP->set_display_name("[Replaced by Adaptive Mana] Combo Heal under x% HP");
 
@@ -468,7 +468,6 @@ namespace sona {
 			qMenu::amplifyAA->set_display_name("Use to amplify AutoAttacks");
 			qMenu::amplifyDirect->set_display_name("^Only when also hitting x direct");
 			qMenu::autoMana->is_hidden() = false;
-			qMenu::sepAuto->is_hidden() = false;
 
 			wMenu::comboHealHP->set_display_name("Use in combo if ally under x% HP");
 
@@ -526,10 +525,10 @@ namespace sona {
 				qMenu::amplifyAA = qMenu->add_checkbox("AmplifyAA", "Use to amplify autoattacks", true);
 				qMenu::amplifyAA->set_tooltip("Adaptive Mana:\nunder 20%: Disabled");
 
-				qMenu::amplifyDirect = qMenu->add_slider("AmplifyDirect", "^Only when also hitting x direct", 1, 0, 2);
+				qMenu::amplifyDirect = qMenu->add_slider("AmplifyDirect", "^ Only when also hitting x direct", 1, 0, 2);
 				qMenu::amplifyDirect->set_tooltip("Adaptive Mana:\nunder 20%: Disabled\nunder 40%: 2\nabove 40%: 1");
 
-				qMenu::removeSpellshields = qMenu->add_checkbox("removeSpellshields", "Auto Q to remove Spellshields", true);
+				qMenu::removeSpellshields = qMenu->add_checkbox("removeSpellshields", "Auto Q to remove Spellshields / First Strike", true);
 				qMenu::removeSpellshields->set_tooltip("Doesnt include Sivir E because i dont want to heal her");
 
 				qMenu::autoMana = qMenu->add_slider("AutoMana", "Only auto use when above x% mana", 30, 0, 100);
@@ -608,7 +607,7 @@ namespace sona {
 				float rcolor[] = { 1.f, 1.f, 0.f, 1.f };
 				colorMenu::rColor = colorMenu->add_colorpick("colorR", "R Range Color", rcolor);
 			}
-
+			mainMenuTab->add_separator("version", "Version: " + VERSION);
 
 			// to set hidden on load when Adaptive Mana is still on
 			{
@@ -625,6 +624,7 @@ namespace sona {
 		hasComet = myhero->has_perk(8229);
 		hasManaflowband = myhero->has_perk(8226);
 		// find these in datadragon/{patch}/data/{lang}/runesReforged.json, but shouldnt update near future i think?
+		
 
 	}
 	void unload()
