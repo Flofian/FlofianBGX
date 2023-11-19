@@ -231,12 +231,15 @@ namespace Database
 
                 case champion_id::Poppy:
                     InitiateSlot(tab, e, spellslot::r, "Poppy", "Keeper's Verdict", true, 1);
+                    break;
 
                 case champion_id::Pyke:
                     InitiateSlot(tab, e, spellslot::q, "Pyke", "Bone Skewer", false, 1);
+                    break;
 
                 case champion_id::Quinn:
                     InitiateSlot(tab, e, spellslot::r, "Quinn", "Behind Enemy Lines", false, 1);
+                    break;
 
                 case champion_id::Rammus:
                     InitiateSlot(tab, e, spellslot::q, "Rammus", "Powerball", false, 1);

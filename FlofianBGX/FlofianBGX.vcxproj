@@ -162,6 +162,7 @@
     <ClCompile Include="..\plugin_sdk\plugin_sdk.cpp" />
     <ClCompile Include="..\spelldb\SpellDB.cpp" />
     <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="nautilus.cpp" />
     <ClCompile Include="sona.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -169,6 +170,7 @@
     <ClInclude Include="..\plugin_sdk\cpplinq.h" />
     <ClInclude Include="..\plugin_sdk\plugin_sdk.hpp" />
     <ClInclude Include="..\spelldb\SpellDB.h" />
+    <ClInclude Include="nautilus.h" />
     <ClInclude Include="sona.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -28,6 +28,9 @@
     <ClCompile Include="..\spelldb\SpellDB.cpp">
       <Filter>spelldb</Filter>
     </ClCompile>
+    <ClCompile Include="nautilus.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\plugin_sdk\cpplinq.h">
@@ -44,6 +47,9 @@
     </ClInclude>
     <ClInclude Include="..\spelldb\SpellDB.h">
       <Filter>spelldb</Filter>
+    </ClInclude>
+    <ClInclude Include="nautilus.h">
+      <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
