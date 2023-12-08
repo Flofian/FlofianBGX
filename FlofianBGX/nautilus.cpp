@@ -15,10 +15,11 @@ namespace nautilus {
 	std::map<std::uint32_t, TreeEntry*> r_whitelist;
 
 	namespace generalMenu {
-
+		TreeEntry* debug = nullptr;
 	}
 	namespace qMenu {
 		TreeEntry* range = nullptr;
+		TreeEntry* hitchance = nullptr;
 		TreeTab* whitelist = nullptr;
 	}
 	namespace wMenu {
@@ -56,11 +57,57 @@ namespace nautilus {
 		return entry->second->get_bool();
 	}
 
+	hit_chance get_hitchance(const int hc)
+	{
+		switch (hc)
+		{
+		case 0:
+			return hit_chance::low;
+		case 1:
+			return hit_chance::medium;
+		case 2:
+			return hit_chance::high;
+		case 3:
+			return hit_chance::very_high;
+		}
+		return hit_chance::medium;
+	}
+
+	vector getQCastPos(game_object_script target, bool ignore_spellshield = false) {
+		if (target && target->is_valid() && target->get_distance(myhero) < qMenu::range->get_int() && (ignore_spellshield || !target->get_is_cc_immune()) && target->is_visible()) {
+			auto pred = q->get_prediction(target);
+			if (pred.hitchance < get_hitchance(qMenu::hitchance->get_int())) return vector();
+			auto castpos = pred.get_cast_position();
+			bool canhit = true;
+			for (int i = 0; i <= 1060; i += 5) {
+				auto p = ((castpos - myhero->get_position()).normalized() * i) + myhero->get_position();
+				if (p.distance(myhero) > pred.get_unit_position().distance(myhero) - target->get_bounding_radius()) break;
+				if (p.is_wall()){
+					canhit = false;
+					break;
+				}
+			}
+			if (canhit) return castpos;
+
+		}
+		return vector();
+	}
 	float calcShieldValue() {
 		// Include Runes/Items/Antishield Debuff in the future
 		float shield = 40 + 10 * w->level() + (0.07 + 0.01 * w->level())*myhero->get_max_health();
 
 		return shield;
+	}
+	int countRTargets(game_object_script target) {
+		int count = 1;
+		auto predPos = prediction->get_prediction(target, 0.6f);
+		auto hitbox = geometry::rectangle(myhero->get_position(), predPos.get_unit_position(),150).to_polygon();
+		for (const game_object_script& enemy : entitylist->get_enemy_heroes()) {
+			if (enemy && enemy->is_valid() &&enemy!=target && hitbox.is_inside(prediction->get_prediction(enemy, 0.6f).get_unit_position()) && enemy->is_targetable() && enemy->is_visible()) {
+				count++;
+			}
+		}
+		return count;
 	}
 
 	void automatic() {
@@ -75,9 +122,30 @@ namespace nautilus {
 	void combo() {
 		if (q->is_ready()) {
 			auto target = target_selector->get_target(q, damage_type::magical);
-			if (!target->get_is_cc_immune() && checkWhitelist(target)) {
-				auto pred = q->get_prediction(target);
-				if (pred.hitchance >= hit_chance::medium) q->cast(pred.get_cast_position());
+			if (target && target->is_valid() && !target->get_is_cc_immune() && checkWhitelist(target)) {
+				auto castpos = getQCastPos(target);
+				if (castpos != vector()) 
+					q->cast(castpos);
+			}
+		}
+		if (e->is_ready()) {
+			for (const game_object_script& enemy : entitylist->get_enemy_heroes()) {
+				if (enemy && enemy->is_valid() && enemy->get_distance(myhero) < eMenu::range->get_int() && enemy->is_targetable() && enemy->is_visible()) {
+					e->cast();
+					break;
+				}
+			}
+		}
+		if (r->is_ready()) {
+			auto selectedTarget = target_selector->get_selected_target();
+			if (selectedTarget && selectedTarget->is_valid() && selectedTarget->get_distance(myhero) < r->range()) {
+				r->cast(selectedTarget);
+			}
+			else {
+				auto target = target_selector->get_target(r, damage_type::magical);
+				if (target && target->is_valid() && !target->get_is_cc_immune() && checkWhitelist(target, true)) {
+					r->cast(target);
+				}
 			}
 		}
 	}
@@ -104,6 +172,33 @@ namespace nautilus {
 			draw_manager->add_circle(myhero->get_position(), eMenu::range->get_int(), colorMenu::eColor->get_color());
 		if ((r->is_ready() || !drawMenu::drawOnlyReady->get_bool()) && drawMenu::drawRangeR->get_bool())
 			draw_manager->add_circle(myhero->get_position(), rMenu::range->get_int(), colorMenu::rColor->get_color());
+		if (generalMenu::debug->get_bool()){
+			auto mouse = hud->get_hud_input_logic()->get_game_cursor_position();
+			for (int i = 0; i <= 1060; i+=5) {
+				auto p = ((mouse - myhero->get_position()).normalized() * i)+myhero->get_position();
+				auto c = p.is_wall() ? MAKE_COLOR(255, 0, 0, 255) : MAKE_COLOR(0, 255, 0, 255);
+				draw_manager->add_circle(p, 2.5f, c);
+			}
+			for (const game_object_script& enemy : entitylist->get_enemy_heroes()) {
+				auto rhits = countRTargets(enemy);
+				if (enemy->get_position().distance(myhero)<rMenu::range->get_int())
+					draw_manager->add_text(enemy->get_position() + vector(0, 50), MAKE_COLOR(0, 0, 255, 255), 30, "R: %i", rhits);
+
+				auto pred = q->get_prediction(enemy);
+				if (pred.hitchance < get_hitchance(qMenu::hitchance->get_int()) || !enemy->is_visible()) continue;
+				auto castpos = pred.get_cast_position();
+				bool canhit = true;
+				for (int i = 0; i <= 1060; i += 5) {
+					auto p = ((castpos - myhero->get_position()).normalized() * i) + myhero->get_position();
+					if (p.distance(myhero) > pred.get_unit_position().distance(myhero)-enemy->get_bounding_radius()) break;
+					auto c = p.is_wall() ? MAKE_COLOR(255, 0, 0, 255) : MAKE_COLOR(0, 255, 0, 255);
+					draw_manager->add_circle(p, 2.5f, c);
+					if (p.is_wall()) canhit = false;
+				}
+				auto c = !canhit ? MAKE_COLOR(255, 0, 0, 255) : MAKE_COLOR(0, 255, 0, 255);
+				draw_manager->add_text(enemy->get_position(), c, 30, canhit ? "Can hit" : "Hit Wall");
+			}
+		}
 	}
 
 	void load() {
@@ -111,13 +206,18 @@ namespace nautilus {
 		w = plugin_sdk->register_spell(spellslot::w, 0);
 		e = plugin_sdk->register_spell(spellslot::e, 590);
 		r = plugin_sdk->register_spell(spellslot::r, 825);
-		q->set_skillshot(0.25, 90, 2000, { collisionable_objects::minions, collisionable_objects::yasuo_wall, collisionable_objects::walls }, skillshot_type::skillshot_line);
+		q->set_skillshot(0.25, 90, 2000, { collisionable_objects::minions, collisionable_objects::yasuo_wall}, skillshot_type::skillshot_line);
+		
+		
 		mainMenuTab = menu->create_tab("Flofian_Nautilus", "Flofian Nautilus");
 		mainMenuTab->set_assigned_texture(myhero->get_square_icon_portrait());
 
 		//Menu
 		{
-			//auto generalMenu = mainMenuTab->add_tab("General", "General Settings");
+			auto generalMenu = mainMenuTab->add_tab("General", "General Settings");
+			{
+				generalMenu::debug = generalMenu->add_checkbox("debug", "Debug", false);
+			}
 
 			auto qMenu = mainMenuTab->add_tab("Q", "Q Settings");
 			{
@@ -126,6 +226,7 @@ namespace nautilus {
 				qMenu::range->add_property_change_callback([](TreeEntry* entry) {
 					q->set_range(entry->get_int());
 					});
+				qMenu::hitchance = qMenu->add_combobox("Hitchance", "Hitchance", { {"Low", nullptr}, {"Medium", nullptr},{"High", nullptr},{"Very High", nullptr} }, 1);
 
 				qMenu::whitelist = qMenu->add_tab("whitelist", "Use Q on");
 			}

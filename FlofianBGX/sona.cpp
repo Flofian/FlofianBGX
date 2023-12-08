@@ -4,7 +4,7 @@
 
 
 namespace sona {
-	std::string VERSION = "1.3.2";
+	std::string VERSION = "1.4.0";
 	script_spell* q = nullptr;
 	script_spell* w = nullptr;
 	script_spell* e = nullptr;
@@ -25,6 +25,7 @@ namespace sona {
 	{
 		TreeEntry* recallCheck = nullptr;
 		TreeEntry* turretCheck = nullptr;
+		TreeEntry* brushCheck = nullptr;
 		TreeEntry* adaptiveMana = nullptr;
 		TreeEntry* debugMode = nullptr;
 	}
@@ -154,12 +155,13 @@ namespace sona {
 	bool canCastQ(bool isAuto) {
 		bool recallCheck = !generalMenu::recallCheck->get_bool() || !myhero->is_recalling();
 		bool turretCheck = !generalMenu::turretCheck->get_bool() || !myhero->is_under_enemy_turret();
+		bool brushCheck = !generalMenu::brushCheck->get_bool() || !myhero->get_position().is_wall_of_grass();
 		bool manaCheck = myhero->get_mana_percent() > qMenu::autoMana->get_int() || adaptiveMana;
 		bool tearCheck = !qMenu::waitTear->get_bool() || tearItem == spellslot::invalid || myhero->get_spell(tearItem)->cooldown() <= 0;
 						// Dont check OR dont have OR is ready
 
 
-		bool autoCheck = !isAuto || (manaCheck && recallCheck && turretCheck && tearCheck && checkRunesReady());
+		bool autoCheck = !isAuto || (manaCheck && recallCheck && turretCheck && brushCheck && tearCheck && checkRunesReady());
 		return q->is_ready() && autoCheck;
 	}
 	int countEnemiesInQRange() {
@@ -490,7 +492,8 @@ namespace sona {
 			auto generalMenu = mainMenuTab->add_tab("General", "General Settings");
 			{
 				generalMenu::recallCheck = generalMenu->add_checkbox("RecallCheck", "Dont use anything automatically while recalling", true);
-				generalMenu::turretCheck = generalMenu->add_checkbox("TurretCheck", "Dont use anything automatically under Enemy turret", true);
+				generalMenu::turretCheck = generalMenu->add_checkbox("TurretCheck", "Dont use Auto Q under Enemy turret", true);
+				generalMenu::brushCheck = generalMenu->add_checkbox("brushCheck", "Dont use Auto Q while in brush", false);
 				generalMenu::adaptiveMana = generalMenu->add_checkbox("AdaptiveMana", "Adaptive Mana Mode", true);
 				generalMenu::adaptiveMana->set_tooltip("This removes most of the sliders and instead uses your mana to calc the number of targets\n"
 														"To find the values used by Adaptive Mana Mode, hover over the respective Sliders");
