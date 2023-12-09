@@ -4,7 +4,7 @@
 
 
 namespace sona {
-	std::string VERSION = "1.4.0";
+	std::string VERSION = "1.4.1";
 	script_spell* q = nullptr;
 	script_spell* w = nullptr;
 	script_spell* e = nullptr;
@@ -443,7 +443,8 @@ namespace sona {
 			for (const auto& target : entitylist->get_ally_heroes()) {
 				if (target->is_me()) continue;
 				if (isAllyInAuraRange(target))
-					draw_manager->add_circle(target->get_position(), target->get_bounding_radius(), colorMenu::pColor->get_color());
+					//draw_manager->add_circle(target->get_position(), target->get_bounding_radius(), colorMenu::pColor->get_color());
+					draw_manager->add_circle_with_glow(target->get_position(), colorMenu::pColor->get_color(), target->get_bounding_radius(),1, glow_data(0.8, 0.8, 0, 0));
 			}
 			
 		}
@@ -619,7 +620,7 @@ namespace sona {
 			}
 		}
 		
-		event_handler<events::on_draw>::add_callback(on_draw);
+		event_handler<events::on_env_draw>::add_callback(on_draw);
 		event_handler<events::on_update>::add_callback(on_update);
 		
 		if (missioninfo->get_map_id() == game_map_id::HowlingAbyss) isAram = true;
@@ -637,7 +638,7 @@ namespace sona {
 		plugin_sdk->remove_spell(e);
 		plugin_sdk->remove_spell(r);
 
-		event_handler<events::on_draw>::remove_handler(on_draw);
+		event_handler<events::on_env_draw>::remove_handler(on_draw);
 		event_handler<events::on_update>::remove_handler(on_update);
 	}
 	

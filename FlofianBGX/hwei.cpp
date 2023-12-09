@@ -45,6 +45,31 @@ namespace hwei {
 		}
 
 	}
+	std::string spellslotstring(spellslot slot) {
+		if (slot == spellslot::invalid)return "invalid";
+		if (slot == spellslot::q)return "q";
+		if (slot == spellslot::w)return "w";
+		if (slot == spellslot::e)return "e";
+		if (slot == spellslot::r)return "r";
+		if (slot == spellslot::recall)return "recall";
+		if (slot == spellslot::trinket)return "trinket";
+		if (slot == spellslot::summoner1)return "summoner1";
+		if (slot == spellslot::summoner2)return "summoner2";
+		if (slot == spellslot::item_1)return "item_1";
+		if (slot == spellslot::item_2)return "item_2";
+		if (slot == spellslot::item_3)return "item_3";
+		if (slot == spellslot::item_4)return "item_4";
+		if (slot == spellslot::item_5)return "item_5";
+		if (slot == spellslot::item_6)return "item_6";
+		return "INV";
+	}
+
+	void on_process_spell_cast(game_object_script sender, spell_instance_script spell)
+	{
+		if (sender == myhero) {
+			console->print(spellslotstring(spell->get_spellslot()).c_str());
+		}
+	}
 
 	void load() {
 		r = plugin_sdk->register_spell(spellslot::r, 1300);
@@ -57,6 +82,7 @@ namespace hwei {
 
 		event_handler<events::on_draw>::add_callback(on_draw);
 		event_handler<events::on_update>::add_callback(on_update);
+		event_handler<events::on_process_spell_cast>::add_callback(on_process_spell_cast);
 
 	}
 	void unload() {
@@ -64,6 +90,7 @@ namespace hwei {
 		plugin_sdk->remove_spell(qq);
 		event_handler<events::on_draw>::remove_handler(on_draw);
 		event_handler<events::on_update>::remove_handler(on_update);
+		event_handler<events::on_process_spell_cast>::remove_handler(on_process_spell_cast);
 
 	}
 }
