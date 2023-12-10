@@ -5,7 +5,7 @@
 
 PLUGIN_NAME( "Flofian" );
 PLUGIN_TYPE(plugin_type::champion);
-SUPPORTED_CHAMPIONS(champion_id::Sona)//, champion_id::Hwei)//, champion_id::Nautilus);
+SUPPORTED_CHAMPIONS(champion_id::Sona, champion_id::Nautilus);//, champion_id::Hwei)//
 
 PLUGIN_API bool on_sdk_load( plugin_sdk_core* plugin_sdk_good )
 {
@@ -15,9 +15,9 @@ PLUGIN_API bool on_sdk_load( plugin_sdk_core* plugin_sdk_good )
     case champion_id::Sona:
         sona::load();
         break;
-    /*case champion_id::Nautilus:
+    case champion_id::Nautilus:
         nautilus::load();
-        break;
+        break;/*
     case champion_id::Hwei:
         hwei::load();
         break;*/
@@ -36,9 +36,9 @@ PLUGIN_API void on_sdk_unload( )
     case champion_id::Sona:
         sona::unload();
         break;
-    /*case champion_id::Nautilus:
+    case champion_id::Nautilus:
         nautilus::unload();
-        break;
+        break;/*
     case champion_id::Hwei:
         hwei::unload();
         break;*/

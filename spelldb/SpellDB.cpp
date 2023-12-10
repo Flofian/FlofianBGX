@@ -131,7 +131,7 @@ namespace Database
         }
     }
 
-    void InitializeCancelMenu(TreeTab* tab)
+    void InitializeCancelMenu(TreeTab* tab, bool isCheap)
     {
         if (!tab) // To prevent crashes in case of bad usage!
         {
@@ -160,7 +160,7 @@ namespace Database
                     break;
 
                 case champion_id::FiddleSticks:
-                    InitiateSlot(tab, e, spellslot::w, "Fiddlesticks", "Bountiful Harvest", false, 1);
+                    InitiateSlot(tab, e, spellslot::w, "Fiddlesticks", "Bountiful Harvest", isCheap, 1);
                     InitiateSlot(tab, e, spellslot::r, "Fiddlesticks", "Crowstorm", true, 1);
                     break;
 
@@ -174,7 +174,7 @@ namespace Database
                     break;
 
                 case champion_id::Irelia:
-                    InitiateSlot(tab, e, spellslot::w, "Irelia", "Defiant Dance", false, 1);
+                    InitiateSlot(tab, e, spellslot::w, "Irelia", "Defiant Dance", isCheap, 1);
                     break;
 
                 case champion_id::Janna:
@@ -210,7 +210,7 @@ namespace Database
                     break;
 
                 case champion_id::MasterYi:
-                    InitiateSlot(tab, e, spellslot::w, "Master Yi", "Meditate", false, 1);
+                    InitiateSlot(tab, e, spellslot::w, "Master Yi", "Meditate", isCheap, 1);
                     break;
 
                 case champion_id::MissFortune:
@@ -218,7 +218,7 @@ namespace Database
                     break;
 
                 case champion_id::Nunu:
-                    InitiateSlot(tab, e, spellslot::w, "Nunu and Willump", "Biggest Snowball Ever!", false, 1);
+                    InitiateSlot(tab, e, spellslot::w, "Nunu and Willump", "Biggest Snowball Ever!", isCheap, 1);
 
                     InitiateSlot(tab, e, spellslot::r, "Nunu and Willump", "Absolute Zero", true, 1);
                     break;
@@ -238,7 +238,7 @@ namespace Database
                     break;
 
                 case champion_id::Quinn:
-                    InitiateSlot(tab, e, spellslot::r, "Quinn", "Behind Enemy Lines", false, 1);
+                    InitiateSlot(tab, e, spellslot::r, "Quinn", "Behind Enemy Lines", isCheap, 1);
                     break;
 
                 case champion_id::Rammus:
@@ -258,12 +258,12 @@ namespace Database
                     break;
 
                 case champion_id::Sion:
-                    InitiateSlot(tab, e, spellslot::q, "Sion", "Decimating Smash", false, 1);
+                    InitiateSlot(tab, e, spellslot::q, "Sion", "Decimating Smash", isCheap, 1);
                     //InitiateSlot(tab, e, spellslot::r, "Sion", "Unstoppable Onslaught", false, 1);
                     break;
 
                 case champion_id::TahmKench:
-                    InitiateSlot(tab, e, spellslot::w, "Tahm Kench", "Abyssal Dive", false, 1);
+                    InitiateSlot(tab, e, spellslot::w, "Tahm Kench", "Abyssal Dive", isCheap, 1);
                     break;
 
                 case champion_id::Taliyah:
