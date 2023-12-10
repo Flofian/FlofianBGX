@@ -290,6 +290,7 @@ namespace nautilus {
 			auto generalMenu = mainMenuTab->add_tab("General", "General Settings");
 			{
 				generalMenu::debug = generalMenu->add_checkbox("debug", "Debug", false);
+				generalMenu::debug->is_hidden() = true;
 				generalMenu::waitRunes = generalMenu->add_combobox("waitRunes", "Only Q with Aftershock/Glacial Augment ready", { {"Always", nullptr}, {"Only in Harass", nullptr}, {"Never", nullptr} }, 1);
 				generalMenu::waitRunes->set_tooltip("Gets ignored if you dont have those runes");
 				generalMenu::forceOrb = generalMenu->add_checkbox("forceOrb", "Try to force Orbwalker for passive root", true);
