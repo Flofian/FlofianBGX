@@ -48,7 +48,7 @@ namespace Database
 	// int getSpellImportanceByHash(uint32_t hash); - Not done yet.
 
 	// Initializes Cancel Spell Menu, will only initialize for Champions Supported **and** in-game!
-	void InitializeCancelMenu(TreeTab* tab);
+	void InitializeCancelMenu(TreeTab* tab, bool isCheap=false);
 
 	// Initializes Buff Menu, will only initialize for Champions Supported **and** in-game!
 	void InitializeBuffMenu(TreeTab* tab);
