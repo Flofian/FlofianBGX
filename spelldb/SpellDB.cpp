@@ -1,11 +1,10 @@
-// You are free to use this as you will, you can modify it freely!
-// It'd be appreciated if you left the credits in the menu functions though :)
-// Updates can be found at https://github.com/0x8L4H4J/BGXAddons
-// Feel free to join my Discord at https://discord.gg/czsJYCYSn8 as I'll be pinging the 'BGX Dev' role everytime the databases are updated!
+// Based on Omori SpellDB (https://github.com/BGXBreaker/BGXAddons)
+// Feel free to join Omoris Discord at https://discord.gg/czsJYCYSn8
 #include "SpellDB.h"
 
 namespace Database
 {
+    auto rbuffhashes = { buff_hash("LucianR"), buff_hash("SamiraR")};
     namespace db
     {
         std::map<std::string, TreeEntry*> CanCancel;
@@ -44,7 +43,7 @@ namespace Database
             return target->get_model();
     }
 
-    void InitiateSlot(TreeTab* tab, game_object_script entity, spellslot slot, std::string name, std::string spellName, bool defaultValue, int mode)
+    void InitiateSlot(TreeTab* tab, game_object_script entity, spellslot slot, std::string name, std::string spellName, int defaultValue)
     {
         std::string key;
         void* texture;
@@ -86,9 +85,6 @@ namespace Database
             texture = entity->get_passive_icon_texture();
             break;
         }
-
-        if (entity != nullptr)
-        {
             auto model = entity->get_model();
             auto displayName = getDisplayName(entity);
             auto id = std::to_string((int)entity->get_champion());
@@ -96,49 +92,16 @@ namespace Database
             auto t = tab->add_tab(model, "[" + displayName + "]");
             t->set_texture(entity->get_square_icon_portrait());
 
-            switch (mode)
-            {
-                case 1: // Consider Case 1 as "Cancel"
-                    db::CanCancel[model + key] = t->add_checkbox(model + key, "[" + key + "] - " + spellName, defaultValue);
-                    if (texture != nullptr)
-                    {
-                        db::CanCancel[model + key]->set_texture(texture);
-                    }
-                    //db::CanCancel[model + key]->set_tooltip("[Importance] of " + std::to_string(localImportance(entity->get_champion(), slot)));
-                    break;
-                case 2: // Consider Case 2 as "Ally Buff"
-                    db::CanOnAllyBuff[id + key] = t->add_checkbox(id + key, "[" + key + "] - " + spellName, defaultValue);
-                    if (texture != nullptr)
-                    {
-                        db::CanOnAllyBuff[id + key]->set_texture(texture);
-                    }
-                    break;
-            }
-        }
-        else // Consider this as for Items/Runes
-        {
-            auto t = tab->add_tab(spellName, "[" + name + "]");
-            switch (mode)
-            {
-                case 1: // Consider Case 1 as "Cancel"
-                    // db::CanCancel[model + key] = t->add_checkbox(model + key, "[" + key + "] - " + spellName, defaultValue);
-                    break;
-                case 2: // Consider Case 2 as "Ally Buff"
-                    db::CanOnAllyBuff[spellName] = t->add_checkbox(spellName, "[" + key + "] - " + spellName, defaultValue);
-                    break;
-            }
 
-        }
+            db::CanCancel[model + key] = t->add_slider(model + key, "[" + key + "] - " + spellName, defaultValue,0,3,true);
+            if (texture != nullptr)
+            {
+                db::CanCancel[model + key]->set_texture(texture);
+            }
     }
 
-    void InitializeCancelMenu(TreeTab* tab, bool isCheap)
+    void InitializeCancelMenu(TreeTab* tab)
     {
-        if (!tab) // To prevent crashes in case of bad usage!
-        {
-            console->print_error("[BlahajDB] - Error Code: DB-IM1");
-            return;
-        }
-
         std::vector<game_object_script> enemyList = entitylist->get_enemy_heroes();
 
         for (auto& e : enemyList)
@@ -152,177 +115,181 @@ namespace Database
 
             switch (id) {
                 case champion_id::Akshan:
-                    InitiateSlot(tab, e, spellslot::r, "Akshan", "Comeuppance", true, 1);
+                    InitiateSlot(tab, e, spellslot::r, "Akshan", "Comeuppance", 2);
+                    break;
+
+                case champion_id::Briar:
+                    InitiateSlot(tab, e, spellslot::e, "Briar", "Comeuppance", 0);
                     break;
 
                 case champion_id::Caitlyn:
-                    InitiateSlot(tab, e, spellslot::r, "Caitlyn", "Ace in the Hole", true, 1);
+                    InitiateSlot(tab, e, spellslot::r, "Caitlyn", "Ace in the Hole", 3);
                     break;
 
                 case champion_id::FiddleSticks:
-                    InitiateSlot(tab, e, spellslot::w, "Fiddlesticks", "Bountiful Harvest", isCheap, 1);
-                    InitiateSlot(tab, e, spellslot::r, "Fiddlesticks", "Crowstorm", true, 1);
+                    InitiateSlot(tab, e, spellslot::w, "Fiddlesticks", "Bountiful Harvest", 1);
+                    InitiateSlot(tab, e, spellslot::r, "Fiddlesticks", "Crowstorm", 3);
                     break;
 
                 case champion_id::Galio:
-                    InitiateSlot(tab, e, spellslot::w, "Galio", "Shield of Durand", false, 1);
-                    InitiateSlot(tab, e, spellslot::r, "Galio", "Hero's Entrance", true, 1);
+                    InitiateSlot(tab, e, spellslot::w, "Galio", "Shield of Durand", 1);
+                    InitiateSlot(tab, e, spellslot::r, "Galio", "Hero's Entrance", 3);
                     break;
 
                 case champion_id::Gragas:
-                    InitiateSlot(tab, e, spellslot::w, "Gragas", "Drunken Rage", false, 1);
+                    InitiateSlot(tab, e, spellslot::w, "Gragas", "Drunken Rage", 0);
                     break;
 
                 case champion_id::Irelia:
-                    InitiateSlot(tab, e, spellslot::w, "Irelia", "Defiant Dance", isCheap, 1);
+                    InitiateSlot(tab, e, spellslot::w, "Irelia", "Defiant Dance", 0);
                     break;
 
                 case champion_id::Janna:
-                    InitiateSlot(tab, e, spellslot::r, "Janna", "Monsoon", true, 1);
+                    InitiateSlot(tab, e, spellslot::r, "Janna", "Monsoon", 3);
                     break;
 
                 case champion_id::Jhin:
-                    InitiateSlot(tab, e, spellslot::r, "Jhin", "Curtain's Call", true, 1);
+                    InitiateSlot(tab, e, spellslot::r, "Jhin", "Curtain's Call", 3);
                     break;
 
                 case champion_id::Karthus:
-                    InitiateSlot(tab, e, spellslot::r, "Karthus", "Requiem", true, 1);
+                    InitiateSlot(tab, e, spellslot::r, "Karthus", "Requiem", 3);
                     break;
 
                 case champion_id::Katarina:
-                    InitiateSlot(tab, e, spellslot::r, "Katarina", "Death Lotus", true, 1);
+                    InitiateSlot(tab, e, spellslot::r, "Katarina", "Death Lotus", 3);
                     break;
 
                 case champion_id::Kayn:
-                    InitiateSlot(tab, e, spellslot::r, "Kayn", "Umbral Trespass", false, 1);
+                    InitiateSlot(tab, e, spellslot::r, "Kayn", "Umbral Trespass", 0);
                     break;
 
                 case champion_id::KSante:
-                    InitiateSlot(tab, e, spellslot::w, "K'Sante", "Path Maker", false, 1);
-                    break;
+                    InitiateSlot(tab, e, spellslot::w, "K'Sante", "Path Maker", 0);
 
                 case champion_id::Lucian:
-                    InitiateSlot(tab, e, spellslot::r, "Lucian", "The Culling", true, 1);
+                    InitiateSlot(tab, e, spellslot::r, "Lucian", "The Culling", 3);
                     break;
 
                 case champion_id::Malzahar:
-                    InitiateSlot(tab, e, spellslot::r, "Malzahar", "Death Grasp", true, 1);
+                    InitiateSlot(tab, e, spellslot::r, "Malzahar", "Death Grasp", 3);
                     break;
 
                 case champion_id::MasterYi:
-                    InitiateSlot(tab, e, spellslot::w, "Master Yi", "Meditate", isCheap, 1);
+                    InitiateSlot(tab, e, spellslot::w, "Master Yi", "Meditate", 1);
                     break;
 
                 case champion_id::MissFortune:
-                    InitiateSlot(tab, e, spellslot::r, "Miss Fortune", "Bullet Time", true, 1);
+                    InitiateSlot(tab, e, spellslot::r, "Miss Fortune", "Bullet Time", 3);
+                    break;
+
+                case champion_id::Naafiri:
+                    InitiateSlot(tab, e, spellslot::w, "Naafiri", "Comeuppance", 1);
                     break;
 
                 case champion_id::Nunu:
-                    InitiateSlot(tab, e, spellslot::w, "Nunu and Willump", "Biggest Snowball Ever!", isCheap, 1);
-
-                    InitiateSlot(tab, e, spellslot::r, "Nunu and Willump", "Absolute Zero", true, 1);
+                    InitiateSlot(tab, e, spellslot::w, "Nunu and Willump", "Biggest Snowball Ever!", 2);
+                    InitiateSlot(tab, e, spellslot::r, "Nunu and Willump", "Absolute Zero", 3);
                     break;
 
                 case champion_id::Pantheon:
-                    InitiateSlot(tab, e, spellslot::q, "Pantheon", "Comet Spear", false, 1);
+                    InitiateSlot(tab, e, spellslot::q, "Pantheon", "Comet Spear", 1);
 
-                    InitiateSlot(tab, e, spellslot::r, "Pantheon", "Grand Starfall", true, 1);
+                    InitiateSlot(tab, e, spellslot::r, "Pantheon", "Grand Starfall", 3);
                     break;
 
                 case champion_id::Poppy:
-                    InitiateSlot(tab, e, spellslot::r, "Poppy", "Keeper's Verdict", true, 1);
+                    InitiateSlot(tab, e, spellslot::r, "Poppy", "Keeper's Verdict", 3);
                     break;
 
                 case champion_id::Pyke:
-                    InitiateSlot(tab, e, spellslot::q, "Pyke", "Bone Skewer", false, 1);
+                    InitiateSlot(tab, e, spellslot::q, "Pyke", "Bone Skewer", 1);
                     break;
 
                 case champion_id::Quinn:
-                    InitiateSlot(tab, e, spellslot::r, "Quinn", "Behind Enemy Lines", isCheap, 1);
+                    InitiateSlot(tab, e, spellslot::r, "Quinn", "Behind Enemy Lines", 1);
                     break;
 
                 case champion_id::Rammus:
-                    InitiateSlot(tab, e, spellslot::q, "Rammus", "Powerball", false, 1);
+                    InitiateSlot(tab, e, spellslot::q, "Rammus", "Powerball", 0);
                     break;
 
                 case champion_id::Ryze:
-                    InitiateSlot(tab, e, spellslot::r, "Ryze", "Realm Warp", true, 1);
+                    InitiateSlot(tab, e, spellslot::r, "Ryze", "Realm Warp", 3);
                     break;
 
                 case champion_id::Samira:
-                    InitiateSlot(tab, e, spellslot::r, "Samira", "Inferno Trigger", true, 1);
+                    InitiateSlot(tab, e, spellslot::r, "Samira", "Inferno Trigger", 3);
                     break;
 
                 case champion_id::Shen:
-                    InitiateSlot(tab, e, spellslot::r, "Shen", "Stand United", true, 1);
+                    InitiateSlot(tab, e, spellslot::r, "Shen", "Stand United", 3);
                     break;
 
                 case champion_id::Sion:
-                    InitiateSlot(tab, e, spellslot::q, "Sion", "Decimating Smash", isCheap, 1);
-                    //InitiateSlot(tab, e, spellslot::r, "Sion", "Unstoppable Onslaught", false, 1);
+                    InitiateSlot(tab, e, spellslot::q, "Sion", "Decimating Smash", 2);
                     break;
 
                 case champion_id::TahmKench:
-                    InitiateSlot(tab, e, spellslot::w, "Tahm Kench", "Abyssal Dive", isCheap, 1);
+                    InitiateSlot(tab, e, spellslot::w, "Tahm Kench", "Abyssal Dive", 2);
                     break;
 
                 case champion_id::Taliyah:
-                    InitiateSlot(tab, e, spellslot::r, "Taliyah", "Weaver's Wall", false, 1);
+                    InitiateSlot(tab, e, spellslot::r, "Taliyah", "Weaver's Wall", 1);
                     break;
 
                 case champion_id::TwistedFate:
-                    InitiateSlot(tab, e, spellslot::r, "Twisted Fate", "Gate", true, 1);
+                    InitiateSlot(tab, e, spellslot::r, "Twisted Fate", "Gate", 3);
                     break;
 
                 case champion_id::Varus:
-                    InitiateSlot(tab, e, spellslot::q, "Varus", "Piercing Arrow", false, 1);
+                    InitiateSlot(tab, e, spellslot::q, "Varus", "Piercing Arrow", 0);
                     break;
 
                 case champion_id::Velkoz:
-                    InitiateSlot(tab, e, spellslot::r, "Vel'Koz", "Life Form Disintegration Ray", true, 1);
+                    InitiateSlot(tab, e, spellslot::r, "Vel'Koz", "Life Form Disintegration Ray", 4);
                     break;
 
                 case champion_id::Vi:
-                    InitiateSlot(tab, e, spellslot::q, "Vi", "Vault Breaker", false, 1);
+                    InitiateSlot(tab, e, spellslot::q, "Vi", "Vault Breaker", 1);
                     break;
 
                 case champion_id::Viego:
-                    InitiateSlot(tab, e, spellslot::w, "Viego", "Spectral Maw", false, 1);
+                    InitiateSlot(tab, e, spellslot::w, "Viego", "Spectral Maw", 1);
                     break;
 
                 case champion_id::Vladimir:
-                    InitiateSlot(tab, e, spellslot::e, "Vladimir", "Tides of Blood", false, 1);
+                    InitiateSlot(tab, e, spellslot::e, "Vladimir", "Tides of Blood", 1);
                     break;
 
                 case champion_id::Warwick:
-                    InitiateSlot(tab, e, spellslot::q, "Warwick", "Jaws of the Beast", false, 1);
-                    InitiateSlot(tab, e, spellslot::r, "Warwick", "Infinite Duress", true, 1);
+                    InitiateSlot(tab, e, spellslot::q, "Warwick", "Jaws of the Beast", 0);
+                    InitiateSlot(tab, e, spellslot::r, "Warwick", "Infinite Duress", 3);
                     break;
 
                 case champion_id::Xerath:
-                    InitiateSlot(tab, e, spellslot::q, "Xerath", "Arcanopulse", false, 1);
-                    InitiateSlot(tab, e, spellslot::r, "Xerath", "Rite of the Arcane", true, 1);
+                    InitiateSlot(tab, e, spellslot::q, "Xerath", "Arcanopulse", 1);
+                    InitiateSlot(tab, e, spellslot::r, "Xerath", "Rite of the Arcane", 3);
                     break;
 
                 case champion_id::Yuumi:
-                    InitiateSlot(tab, e, spellslot::q, "Yuumi", "Prowling Projectile", false, 1);
-                    InitiateSlot(tab, e, spellslot::r, "Yuumi", "Final Chapter", false, 1);
+                    InitiateSlot(tab, e, spellslot::q, "Yuumi", "Prowling Projectile", 0);
+                    InitiateSlot(tab, e, spellslot::r, "Yuumi", "Final Chapter", 0);
                     break;
 
                 case champion_id::Zac:
-                    InitiateSlot(tab, e, spellslot::r, "Zac", "Elastic Slingshot", false, 1);
+                    InitiateSlot(tab, e, spellslot::e, "Zac", "Elastic Slingshot", 2);
                     break;
 
                 default:
                     break;
             }
         }
-
-        tab->add_separator("databaseInfo", "- Database made by Omori! <3 -");
-        tab->add_separator("databaseVersion", "Version: " + DBVersion);
+        tab->add_separator("sep1", "Change Spell Importance here");
+        tab->add_separator("sep2", "Based on Omori SpellDB");
     }
 
-    bool canCancel(game_object_script target)
+    int getCastingImportance(game_object_script target)
     {
         auto active = target->get_active_spell();
         if (!active)
@@ -349,11 +316,12 @@ namespace Database
                 key = "?";
                 break;
         }
+        if (target->has_buff(rbuffhashes)) key = "R";
 
         auto entity = Database::db::CanCancel.find(target->get_model() + key);
         if (entity == Database::db::CanCancel.end())
-            return false;
+            return 0;
 
-        return entity->second->get_bool();
+        return entity->second->get_int();
     }
 }

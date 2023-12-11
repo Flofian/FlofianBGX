@@ -348,7 +348,7 @@ namespace sona {
 		// R interrupt
 		if (r->is_ready() && (!generalMenu::recallCheck->get_bool() || !myhero->is_recalling()) && rMenu::interrupt->get_bool()) {
 			for (const auto& target : entitylist->get_enemy_heroes()) {
-				if (target && target->is_valid() && target->is_visible() && !target->is_zombie() && target->is_valid_target(rMenu::range->get_int()) && Database::canCancel(target) && !target->get_is_cc_immune()) {
+				if (target && target->is_valid() && target->is_visible() && !target->is_zombie() && target->is_valid_target(rMenu::range->get_int()) && Database::getCastingImportance(target)>=3 && !target->get_is_cc_immune()) {
 					auto pred = r->get_prediction(target, true);
 					if (pred.hitchance >= getHitchance(rMenu::hitchance->get_int())) {
 						r->cast(pred.get_cast_position());
@@ -585,7 +585,7 @@ namespace sona {
 				rMenu::useBoundingBox->is_hidden() = true;		// hide for now
 				rMenu::ignoreSemiHitcount = rMenu->add_checkbox("ignoreSemiHits", "Ignore Hitcount for Semi R if target selected", true);
 				rMenu::ignoreSemiHitcount->set_tooltip("If you click on someone to force that target (red circle under them), ignore how many it can hit");
-				rMenu::interrupt = rMenu->add_checkbox("Interrupt", "Use for Interrupt", true);
+				rMenu::interrupt = rMenu->add_checkbox("Interrupt", "Use to Interrupt Spells with Importance >= 3", true);
 				rMenu::spelldb = rMenu->add_tab("interruptdb", "Interrupt Database");
 				Database::InitializeCancelMenu(rMenu::spelldb);
 			}
