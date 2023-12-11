@@ -124,7 +124,7 @@ namespace nautilus {
 		auto predPos = prediction->get_prediction(target, 0.6f);
 		auto hitbox = geometry::rectangle(myhero->get_position(), predPos.get_unit_position(),150).to_polygon();
 		for (const game_object_script& enemy : entitylist->get_enemy_heroes()) {
-			if (enemy && enemy->is_valid() &&enemy!=target && hitbox.is_inside(prediction->get_prediction(enemy, 0.6f).get_unit_position()) && enemy->is_targetable() && enemy->is_visible()) {
+			if (enemy && enemy->is_valid() &&enemy!=target && hitbox.is_inside(prediction->get_prediction(enemy, 0.6f).get_unit_position()) && enemy->is_targetable() && enemy->is_visible() && !enemy->is_dead()) {
 				count++;
 			}
 		}
