@@ -396,6 +396,8 @@ namespace nautilus {
 		plugin_sdk->remove_spell(e);
 		plugin_sdk->remove_spell(r);
 
+		menu->delete_tab(mainMenuTab);
+
 		event_handler<events::on_draw>::remove_handler(on_draw);
 		event_handler<events::on_env_draw>::remove_handler(on_env_draw);
 		event_handler<events::on_update>::remove_handler(on_update);
