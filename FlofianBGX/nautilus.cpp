@@ -11,6 +11,7 @@ namespace nautilus {
 	script_spell* r = nullptr;
 
 	TreeTab* mainMenuTab = nullptr;
+	TreeTab* spelldb = nullptr;
 
 	std::map<std::uint32_t, TreeEntry*> q_whitelist;
 	std::map<std::uint32_t, TreeEntry*> r_whitelist;
@@ -27,7 +28,6 @@ namespace nautilus {
 		TreeEntry* comboQ = nullptr;
 		TreeEntry* harassQ = nullptr;
 		TreeEntry* interrupt = nullptr;
-		TreeTab* spelldb = nullptr;
 	}
 	namespace wMenu {
 		TreeEntry* autoShield = nullptr;
@@ -47,6 +47,7 @@ namespace nautilus {
 		TreeEntry* comboR = nullptr;
 		TreeEntry* minTargets = nullptr;
 		TreeEntry* forceSelected = nullptr;
+		TreeEntry* interrupt = nullptr;
 	}
 	namespace drawMenu
 	{
@@ -142,12 +143,24 @@ namespace nautilus {
 		// Q interrupt
 		if (q->is_ready() && qMenu::interrupt->get_bool()) {
 			for (const auto& target : entitylist->get_enemy_heroes()) {
-				if (target && target->is_valid() && target->is_visible() && !target->is_zombie() && target->is_valid_target(qMenu::range->get_int()) && Database::canCancel(target) && !target->get_is_cc_immune()) {
+				if (target && target->is_valid() && target->is_visible() && !target->is_zombie() && target->is_valid_target(q->range()) && Database::getCastingImportance(target)>=2 && !target->get_is_cc_immune()) {
 					auto pred = q->get_prediction(target);
 					if (pred.hitchance >= get_hitchance(qMenu::hitchance->get_int())) {
 						q->cast(pred.get_cast_position());
 						if (generalMenu::debug->get_bool()) myhero->print_chat(0, "Interrupt Q on %s hitchance %i", Database::getDisplayName(target).c_str(), pred.hitchance);
 					}
+				}
+
+			}
+		}
+
+		// R interrupt
+		if (r->is_ready() && rMenu::interrupt->get_bool()) {
+			for (const auto& target : entitylist->get_enemy_heroes()) {
+				if (target && target->is_valid() && target->is_visible() && !target->is_zombie() && target->is_valid_target(r->range()) && Database::getCastingImportance(target) >= 3 && !target->get_is_cc_immune()) {
+					r->cast(target);
+					if (generalMenu::debug->get_bool()) myhero->print_chat(0, "Interrupt R on %s", Database::getDisplayName(target).c_str());
+					
 				}
 
 			}
@@ -314,9 +327,7 @@ namespace nautilus {
 				qMenu::whitelist = qMenu->add_tab("whitelist", "Use Q on");
 				qMenu::comboQ = qMenu->add_checkbox("comboQ", "Use Q in Combo", true);
 				qMenu::harassQ = qMenu->add_checkbox("harassQ", "Use Q in Harass", true);
-				qMenu::interrupt = qMenu->add_checkbox("interrupt", "Use Q to interrupt", true);
-				qMenu::spelldb = qMenu->add_tab("interruptdb", "Interrupt Database");
-				Database::InitializeCancelMenu(qMenu::spelldb, true);
+				qMenu::interrupt = qMenu->add_checkbox("interrupt", "Use Q to interrupt Spells with Importance >= 2", true);
 			}
 
 			auto wMenu = mainMenuTab->add_tab("W", "W Settings");
@@ -352,6 +363,7 @@ namespace nautilus {
 				rMenu::minTargets = rMenu->add_slider("minTargets", "Only if it hits X Targets", 2, 1, 5);
 				rMenu::forceSelected = rMenu->add_checkbox("forceSelected", "^ Ignore if Target Selected", true);
 				rMenu::forceSelected->set_tooltip("Ignores the Min Targets option if you have forced the target by clicking on them (red circle below them)");
+				rMenu::interrupt = rMenu->add_checkbox("interrupt", "Use R to interrupt Spells with Importance >= 3", true);
 			}
 
 			auto drawMenu = mainMenuTab->add_tab("drawings", "Drawings Settings");
@@ -370,6 +382,9 @@ namespace nautilus {
 				float rcolor[] = { 1.f, 0.f, 0.f, 1.f };
 				colorMenu::rColor = colorMenu->add_colorpick("colorR", "R Range Color", rcolor);
 			}
+			spelldb = mainMenuTab->add_tab("interruptdb", "Interrupt Database");
+			Database::InitializeCancelMenu(spelldb);
+
 			mainMenuTab->add_separator("version", "Version: " + VERSION);
 			//init whitelists
 			for (auto&& enemy : entitylist->get_enemy_heroes()) {
