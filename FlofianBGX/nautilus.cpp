@@ -269,7 +269,7 @@ namespace nautilus {
 	}
 
 	void on_after_attack_orbwalker(game_object_script target) {
-		if (wMenu::comboW->get_bool() && w->is_ready()) {
+		if (orbwalker->combo_mode() && wMenu::comboW->get_bool() && w->is_ready()) {
 			w->cast();
 		}
 	}
