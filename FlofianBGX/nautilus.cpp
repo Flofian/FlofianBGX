@@ -368,7 +368,9 @@ namespace nautilus {
 			for (auto&& enemy : entitylist->get_enemy_heroes()) {
 				auto networkid = enemy->get_network_id();
 				q_whitelist[networkid] = qMenu::whitelist->add_checkbox(std::to_string(networkid), enemy->get_model(), true, false);
+				q_whitelist[networkid]->set_texture(enemy->get_square_icon_portrait());
 				r_whitelist[networkid] = rMenu::whitelist->add_checkbox(std::to_string(networkid), enemy->get_model(), true, false);
+				r_whitelist[networkid]->set_texture(enemy->get_square_icon_portrait());
 			}
 			//init ranges from config file
 			q->set_range(qMenu::range->get_int());
