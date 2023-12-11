@@ -156,7 +156,8 @@ namespace nautilus {
 		// Force Orb
 		if (generalMenu::forceOrb->get_bool()) {
 			auto defaulttarget = orbwalker->get_target();
-			if (defaulttarget && defaulttarget->is_ai_hero() && defaulttarget->has_buff(buff_hash("nautiluspassivecheck"))) {
+			auto selectedtarget = target_selector->get_selected_target();
+			if (defaulttarget && defaulttarget->is_ai_hero() && defaulttarget->has_buff(buff_hash("nautiluspassivecheck")) && defaulttarget!=selectedtarget) {
 				for (const auto& target : entitylist->get_enemy_heroes()) {
 					if (target && myhero->is_in_auto_attack_range(target) && !target->has_buff(buff_hash("nautiluspassivecheck"))) {
 						orbwalker->set_orbwalking_target(target);
@@ -294,6 +295,7 @@ namespace nautilus {
 				generalMenu::waitRunes = generalMenu->add_combobox("waitRunes", "Only Q with Aftershock/Glacial Augment ready", { {"Always", nullptr}, {"Only in Harass", nullptr}, {"Never", nullptr} }, 1);
 				generalMenu::waitRunes->set_tooltip("Gets ignored if you dont have those runes");
 				generalMenu::forceOrb = generalMenu->add_checkbox("forceOrb", "Try to force Orbwalker for passive root", true);
+				generalMenu::forceOrb->set_tooltip("Gets Ignored if you have a target selected");
 			}
 
 			auto qMenu = mainMenuTab->add_tab("Q", "Q Settings");
