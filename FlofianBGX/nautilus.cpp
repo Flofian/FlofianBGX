@@ -233,13 +233,6 @@ namespace nautilus {
 		{
 			return;
 		}
-
-		if ((q->is_ready() || !drawMenu::drawOnlyReady->get_bool()) && drawMenu::drawRangeQ->get_bool())
-			draw_manager->add_circle(myhero->get_position(), qMenu::range->get_int(), colorMenu::qColor->get_color());
-		if ((e->is_ready() || !drawMenu::drawOnlyReady->get_bool()) && drawMenu::drawRangeE->get_bool())
-			draw_manager->add_circle(myhero->get_position(), eMenu::range->get_int(), colorMenu::eColor->get_color());
-		if ((r->is_ready() || !drawMenu::drawOnlyReady->get_bool()) && drawMenu::drawRangeR->get_bool())
-			draw_manager->add_circle(myhero->get_position(), rMenu::range->get_int(), colorMenu::rColor->get_color());
 		if (generalMenu::debug->get_bool()){
 			auto mouse = hud->get_hud_input_logic()->get_game_cursor_position();
 			for (int i = 0; i <= 1060; i+=5) {
@@ -267,6 +260,18 @@ namespace nautilus {
 				draw_manager->add_text(enemy->get_position(), c, 30, canhit ? "Can hit" : "Hit Wall");
 			}
 		}
+	}
+	void on_env_draw() {
+		if (myhero->is_dead())
+		{
+			return;
+		}
+		if ((q->is_ready() || !drawMenu::drawOnlyReady->get_bool()) && drawMenu::drawRangeQ->get_bool())
+			draw_manager->add_circle(myhero->get_position(), qMenu::range->get_int(), colorMenu::qColor->get_color());
+		if ((e->is_ready() || !drawMenu::drawOnlyReady->get_bool()) && drawMenu::drawRangeE->get_bool())
+			draw_manager->add_circle(myhero->get_position(), eMenu::range->get_int(), colorMenu::eColor->get_color());
+		if ((r->is_ready() || !drawMenu::drawOnlyReady->get_bool()) && drawMenu::drawRangeR->get_bool())
+			draw_manager->add_circle(myhero->get_position(), rMenu::range->get_int(), colorMenu::rColor->get_color());
 	}
 
 	void on_after_attack_orbwalker(game_object_script target) {
@@ -380,6 +385,7 @@ namespace nautilus {
 			r->set_range(rMenu::range->get_int());
 		}
 		event_handler<events::on_draw>::add_callback(on_draw);
+		event_handler<events::on_env_draw>::add_callback(on_env_draw);
 		event_handler<events::on_update>::add_callback(on_update);
 		event_handler<events::on_after_attack_orbwalker>::add_callback(on_after_attack_orbwalker);
 	}
@@ -391,6 +397,7 @@ namespace nautilus {
 		plugin_sdk->remove_spell(r);
 
 		event_handler<events::on_draw>::remove_handler(on_draw);
+		event_handler<events::on_env_draw>::remove_handler(on_env_draw);
 		event_handler<events::on_update>::remove_handler(on_update);
 		event_handler<events::on_after_attack_orbwalker>::remove_handler(on_after_attack_orbwalker);
 	}
