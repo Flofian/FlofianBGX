@@ -179,7 +179,7 @@ namespace nautilus {
 		}
 		if (e->is_ready() && eMenu::comboE->get_bool()) {
 			for (const game_object_script& enemy : entitylist->get_enemy_heroes()) {
-				if (enemy && enemy->is_valid() && enemy->get_distance(myhero) < eMenu::range->get_int() && enemy->is_targetable() && enemy->is_visible()) {
+				if (enemy && enemy->is_valid() && enemy->get_distance(myhero) < eMenu::range->get_int() && enemy->is_targetable() && enemy->is_visible() && !enemy->is_dead()) {
 					e->cast();
 					break;
 				}
@@ -269,7 +269,7 @@ namespace nautilus {
 	}
 
 	void on_after_attack_orbwalker(game_object_script target) {
-		if (wMenu::comboW->get_bool() && w->is_ready()) {
+		if (orbwalker->combo_mode() && wMenu::comboW->get_bool() && w->is_ready()) {
 			w->cast();
 		}
 	}
@@ -368,7 +368,9 @@ namespace nautilus {
 			for (auto&& enemy : entitylist->get_enemy_heroes()) {
 				auto networkid = enemy->get_network_id();
 				q_whitelist[networkid] = qMenu::whitelist->add_checkbox(std::to_string(networkid), enemy->get_model(), true, false);
+				q_whitelist[networkid]->set_texture(enemy->get_square_icon_portrait());
 				r_whitelist[networkid] = rMenu::whitelist->add_checkbox(std::to_string(networkid), enemy->get_model(), true, false);
+				r_whitelist[networkid]->set_texture(enemy->get_square_icon_portrait());
 			}
 			//init ranges from config file
 			q->set_range(qMenu::range->get_int());
