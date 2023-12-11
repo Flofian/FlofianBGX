@@ -179,7 +179,7 @@ namespace nautilus {
 		}
 		if (e->is_ready() && eMenu::comboE->get_bool()) {
 			for (const game_object_script& enemy : entitylist->get_enemy_heroes()) {
-				if (enemy && enemy->is_valid() && enemy->get_distance(myhero) < eMenu::range->get_int() && enemy->is_targetable() && enemy->is_visible()) {
+				if (enemy && enemy->is_valid() && enemy->get_distance(myhero) < eMenu::range->get_int() && enemy->is_targetable() && enemy->is_visible() && !enemy->is_dead()) {
 					e->cast();
 					break;
 				}
