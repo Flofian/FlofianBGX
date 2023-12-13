@@ -31,6 +31,12 @@
     <ClCompile Include="nautilus.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="malphite.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="permashow.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\plugin_sdk\cpplinq.h">
@@ -49,6 +55,12 @@
       <Filter>spelldb</Filter>
     </ClInclude>
     <ClInclude Include="nautilus.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="malphite.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="permashow.hpp">
       <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>
