@@ -356,7 +356,7 @@ namespace nautilus {
 				rMenu->set_assigned_texture(myhero->get_spell(spellslot::r)->get_icon_texture());
 				rMenu::range = rMenu->add_slider("Range", "R Range", 800, 700, 825);
 				rMenu::range->add_property_change_callback([](TreeEntry* entry) {
-					e->set_range(entry->get_int());
+					r->set_range(entry->get_int());
 					});
 				rMenu::whitelist = rMenu->add_tab("whitelist", "Use R on");
 				rMenu::comboR = rMenu->add_checkbox("comboR", "Use R in Combo", true);
