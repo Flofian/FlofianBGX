@@ -13,8 +13,8 @@ namespace malphite {
 	TreeTab* mainMenuTab = nullptr;
 
 	bool useRNow = false;
-	TreeEntry* debugkey = nullptr;
 
+	std::unordered_map<uint32_t, prediction_output> ePredictionList;
 	std::unordered_map<uint32_t, prediction_output> rPredictionList;
 
 	struct rPos {
@@ -23,23 +23,35 @@ namespace malphite {
 	};
 	rPos bestRPos = rPos();
 	rPos bestFRPos = rPos();
+	rPos flashRTarget = rPos();
 
 	namespace generalMenu {
 
 	}
 	namespace qMenu {
 		TreeEntry* autoQHotkey = nullptr;
+		TreeEntry* combo = nullptr;
+		TreeEntry* harass = nullptr;
 	}
 	namespace wMenu {
-
+		TreeEntry* combo = nullptr;
+		TreeEntry* harass = nullptr;
 	}
 	namespace eMenu {
-
+		TreeEntry* range = nullptr;
+		TreeEntry* combo = nullptr;
+		TreeEntry* harass = nullptr;
+		TreeEntry* autoMinTargets = nullptr;
 	}
 	namespace rMenu {
 		TreeEntry* range = nullptr;
 		TreeEntry* radius = nullptr;
 		TreeEntry* hc = nullptr;
+		TreeEntry* comboMin = nullptr;
+		TreeEntry* flashComboMin = nullptr;
+		TreeEntry* autoMin = nullptr;
+		TreeEntry* flashAutoMin = nullptr;
+
 	}
 	namespace drawMenu
 	{
@@ -77,6 +89,7 @@ namespace malphite {
 	}
 
 	void updatePredictionList() {
+		r->set_speed(1500 + myhero->get_move_speed());
 		// I change range here so i dont get pred saying impossible, i want at least flash r range, 
 		// and i think if target is 1100 away, pred says impossible, but casting at 1000 still hits
 		int oldrange = r->range();
@@ -85,10 +98,13 @@ namespace malphite {
 		for (const auto& target : entitylist->get_enemy_heroes())
 		{
 			if (!target->is_valid() || target->is_dead()) continue;
-			prediction_output p = r->get_prediction(target);
-			rPredictionList[target->get_handle()] = p;
+			rPredictionList[target->get_handle()] = r->get_prediction(target);
+			// TODO: Check if thats the true time
+			ePredictionList[target->get_handle()] = prediction->get_prediction(target, 0.2419f);
 		}
 		r->set_range(oldrange);
+
+		
 	}
 
 	vector canHitAll(std::vector<game_object_script> enemies) {
@@ -158,6 +174,99 @@ namespace malphite {
 		
 	}
 
+	void automatic() {
+		if (r->is_ready()) {
+			int mintargets = rMenu::autoMin->get_int();
+			int mintargetsflash = rMenu::flashAutoMin->get_int();
+			if (useRNow) {
+				r->cast(flashRTarget.pos);
+				console->print("Used Auto Flash R, hits: %i, min targets: %i", bestFRPos.hitcount, mintargetsflash);
+				useRNow = false;
+				flashRTarget = rPos();
+				return;
+			}
+			if (mintargetsflash > 0 && bestFRPos.hitcount >= mintargetsflash && flash->is_ready() && bestFRPos.pos != bestRPos.pos) {
+				flash->cast(bestFRPos.pos);
+				flashRTarget = bestFRPos;
+				useRNow = true;
+				console->print("Set Auto Flash Target, hits: %i, min targets: %i", bestFRPos.hitcount, mintargetsflash);
+				return;
+			}
+			if (mintargets > 0 && bestRPos.hitcount >= mintargets) {
+				r->cast(bestRPos.pos);
+				console->print("Used Auto R, hits: %i, min targets: %i", bestRPos.hitcount, mintargets);
+				useRNow = false;
+				return;
+			}
+		}
+		// E
+		if (e->is_ready()) {
+			int minTargets = eMenu::autoMinTargets->get_int();
+			if (minTargets == 0) return;
+			int hits = 0;
+			for (const auto& target : entitylist->get_enemy_heroes()) {
+				auto pred = ePredictionList[target->get_handle()];
+				if (pred.get_unit_position().distance(myhero) < e->range() && pred.hitchance > hit_chance::impossible) hits++;
+			}
+			if (hits >= minTargets) e->cast();
+		}
+	}
+	void combo() {
+		// R
+		if (r->is_ready()){
+			int mintargets = rMenu::comboMin->get_int();
+			int mintargetsflash = rMenu::flashComboMin->get_int();
+			if (useRNow) {
+				r->cast(flashRTarget.pos);
+				console->print("Used Combo Flash R, hits: %i, min targets: %i", bestFRPos.hitcount, mintargetsflash);
+				useRNow = false;
+				flashRTarget = rPos();
+				return;
+			}
+			if (mintargetsflash > 0 && bestFRPos.hitcount >= mintargetsflash && flash->is_ready() && bestFRPos.pos != bestRPos.pos) {
+				flash->cast(bestFRPos.pos);
+				flashRTarget = bestFRPos;
+				useRNow = true;
+				console->print("Set Combo Flash Target, hits: %i, min targets: %i", bestFRPos.hitcount, mintargetsflash);
+				return;
+			}
+			if (mintargets > 0 && bestRPos.hitcount >= mintargets) {
+				r->cast(bestRPos.pos);
+				console->print("Used Combo R, hits: %i, min targets: %i", bestRPos.hitcount, mintargets);
+				useRNow = false;
+				return;
+			}
+		}
+		// Q
+		if (q->is_ready() && qMenu::combo->get_bool()) {
+			auto target = target_selector->get_target(q, damage_type::magical);
+			if (!target) return;
+			q->cast(target);
+		}
+		// E
+		if (e->is_ready() && eMenu::combo->get_bool()) {
+			for (const auto& target : entitylist->get_enemy_heroes()) {
+				auto pred = ePredictionList[target->get_handle()];
+				if (pred.get_unit_position().distance(myhero) < e->range() && pred.hitchance>hit_chance::impossible) e->cast();
+			}
+		}
+	}
+	void harass() {
+		// Q
+		if (q->is_ready() && qMenu::harass->get_bool()) {
+			auto target = target_selector->get_target(q, damage_type::magical);
+			if (!target) return;
+			q->cast(target);
+		}
+		// E
+		if (e->is_ready() && eMenu::harass->get_bool()) {
+			for (const auto& target : entitylist->get_enemy_heroes()) {
+				auto pred = ePredictionList[target->get_handle()];
+				if (pred.get_unit_position().distance(myhero) < e->range() && pred.hitchance > hit_chance::impossible) e->cast();
+			}
+		}
+	}
+
 	void on_env_draw() {
 		if (myhero->is_dead())
 		{
@@ -189,10 +298,9 @@ namespace malphite {
 	}
 	void on_update() {
 		permashow::instance.update();
-		r->set_speed(1500 + myhero->get_move_speed());
 		updatePredictionList();
 		updateBestRPos();
-		if ((debugkey->get_bool() || useRNow) && r->is_ready()) {
+		/*if ((debugkey->get_bool() || useRNow) && r->is_ready()) {
 			if (bestFRPos.pos != bestRPos.pos) {
 				flash->cast(bestFRPos.pos);
 				useRNow = true;
@@ -202,8 +310,12 @@ namespace malphite {
 				r->cast(bestFRPos.pos);
 				useRNow = false;
 			}
-		}
+		}*/
 		//console->print("Center: %f %f %f Hitcount: %i", bestRPos.pos.x, bestRPos.pos.y, bestRPos.pos.z, bestRPos.hitcount);
+
+		if (orbwalker->combo_mode()) combo();
+		if (orbwalker->harass()) harass();
+		automatic();
 	}
 
 	void load() {
@@ -227,12 +339,32 @@ namespace malphite {
 			auto rTexture = myhero->get_spell(spellslot::r)->get_icon_texture();
 			mainMenuTab = menu->create_tab("FlofianMalphite", "Flofian Malphite");
 			mainMenuTab->set_assigned_texture(myhero->get_square_icon_portrait());
-			debugkey = mainMenuTab->add_hotkey("debug", "debug", TreeHotkeyMode::Hold, 0x53, false);
+			
 			auto qMenu = mainMenuTab->add_tab("Q", "Q Settings");
 			{
 				qMenu->set_assigned_texture(qTexture);
 				qMenu::autoQHotkey = qMenu->add_hotkey("autoQHotkey", "Auto Q Toggle", TreeHotkeyMode::Hold, 0x05, false);
+				qMenu::combo = qMenu->add_checkbox("combo", "Use Q in Combo", true);
+				qMenu::harass = qMenu->add_checkbox("harass", "Use Q in Harass", true);
 
+			}
+			auto wMenu = mainMenuTab->add_tab("W", "W Settings");
+			{
+				wMenu->set_assigned_texture(wTexture);
+				wMenu::combo = wMenu->add_checkbox("combo", "Use W in Combo", true);
+				wMenu::harass = wMenu->add_checkbox("harass", "Use W in Harass", true);
+			}
+			auto eMenu = mainMenuTab->add_tab("E", "E Settings");
+			{
+				eMenu->set_assigned_texture(eTexture); 
+				eMenu::range = eMenu->add_slider("Range", "Range", 375, 300, 400);
+				eMenu::range->add_property_change_callback([](TreeEntry* entry) {
+					e->set_range(entry->get_int());
+					});
+				eMenu::combo = eMenu->add_checkbox("combo", "Use E in Combo", true);
+				eMenu::harass = eMenu->add_checkbox("harass", "Use E in Harass", true);
+				eMenu::autoMinTargets = eMenu->add_slider("autoMinTargets", "Min Targets to Auto E", 2, 0, 5);
+				eMenu::autoMinTargets->set_tooltip("0 to disable");
 			}
 			auto rMenu = mainMenuTab->add_tab("R", "R Settings");
 			{
@@ -246,6 +378,13 @@ namespace malphite {
 					r->set_radius(entry->get_int());
 					});
 				rMenu::hc = rMenu->add_combobox("Hitchance", "Hitchance", { {"Low", nullptr}, {"Medium", nullptr},{"High", nullptr},{"Very High", nullptr} }, 2);
+				rMenu->add_separator("sep1", "");
+				rMenu::comboMin = rMenu->add_slider("combomin", "Min Targets in Combo", 2, 0, 5);
+				rMenu::flashComboMin = rMenu->add_slider("flashComboMin", "Min  Targets in Combo to Flash R", 3, 0, 5);
+				rMenu::autoMin = rMenu->add_slider("autoMin", "Min Targets to Auto R", 3, 0, 5);
+				rMenu::flashAutoMin = rMenu->add_slider("flashAutoMin", "Min Targets to Auto Flash R", 4, 0, 5);
+				rMenu->add_separator("sep2", "^ 0 to disable ^");
+
 			}
 
 			auto drawMenu = mainMenuTab->add_tab("drawings", "Draw Settings");
@@ -255,8 +394,8 @@ namespace malphite {
 				drawMenu::drawRangeE = drawMenu->add_checkbox("drawE", "E Range", true);
 				drawMenu::drawRangeR = drawMenu->add_checkbox("drawR", "R Range", true);
 				drawMenu::drawRangeFR = drawMenu->add_checkbox("drawFR", "Flash R Range", true);
-				drawMenu::drawCircleR = drawMenu->add_checkbox("drawRground", "R Target [Ground]", true);
-				drawMenu::drawCircleFR = drawMenu->add_checkbox("drawFRground", "Flash R Target [Ground]", true);
+				drawMenu::drawCircleR = drawMenu->add_checkbox("drawRground", "R Target [Ground]", false);
+				drawMenu::drawCircleFR = drawMenu->add_checkbox("drawFRground", "Flash R Target [Ground]", false);
 
 				auto colorMenu = drawMenu->add_tab("color", "Color Settings");
 
@@ -280,6 +419,12 @@ namespace malphite {
 				drawMenu::drawRangeFR->set_texture(rTexture);
 			}
 		}
+		{
+			e->set_range(eMenu::range->get_int());
+			r->set_range(rMenu::range->get_int());
+			r->set_radius(rMenu::radius->get_int());
+		}
+
 		permashow::instance.init(mainMenuTab);
 		permashow::instance.add_element("Auto Q", qMenu::autoQHotkey);
 
