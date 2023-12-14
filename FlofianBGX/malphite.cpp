@@ -94,6 +94,9 @@ namespace malphite {
 		// and i think if target is 1100 away, pred says impossible, but casting at 1000 still hits
 		int oldrange = r->range();
 		r->set_range(2000);
+		int oldradius = r->radius;
+		r->set_radius(100);
+		//maybe that helps?
 		//prediction_input p = prediction_input{
 		for (const auto& target : entitylist->get_enemy_heroes())
 		{
@@ -103,7 +106,7 @@ namespace malphite {
 			ePredictionList[target->get_handle()] = prediction->get_prediction(target, 0.2419f);
 		}
 		r->set_range(oldrange);
-
+		r->set_radius(oldradius);
 		
 	}
 
@@ -126,7 +129,7 @@ namespace malphite {
 		for (const auto& target : entitylist->get_enemy_heroes()) {
 			// TODO: check spellshield? 
 			if (target && target->is_valid() && target->get_distance(myhero) < rMenu::radius->get_int() + rMenu::range->get_int() + flash->range()
-				&& !target->is_dead() && target->is_visible()) {
+				&& !target->is_dead() && target->is_visible() && target->is_targetable()) {
 
 				enemiesInFlashRRange.push_back(target);
 				if (target->get_distance(myhero) < rMenu::radius->get_int()+ rMenu::range->get_int()) enemiesInRange.push_back(target);
@@ -206,7 +209,7 @@ namespace malphite {
 			int hits = 0;
 			for (const auto& target : entitylist->get_enemy_heroes()) {
 				auto pred = ePredictionList[target->get_handle()];
-				if (pred.get_unit_position().distance(myhero) < e->range() && pred.hitchance > hit_chance::impossible) hits++;
+				if (pred.get_unit_position().distance(myhero) < e->range() && pred.hitchance > hit_chance::impossible && target->is_targetable()) hits++;
 			}
 			if (hits >= minTargets) e->cast();
 		}
