@@ -51,6 +51,7 @@ namespace malphite {
 		TreeEntry* flashComboMin = nullptr;
 		TreeEntry* autoMin = nullptr;
 		TreeEntry* flashAutoMin = nullptr;
+		TreeEntry* forceRSelected = nullptr;
 
 	}
 	namespace drawMenu
@@ -96,7 +97,7 @@ namespace malphite {
 		r->set_range(2000);
 		int oldradius = r->radius;
 		r->set_radius(100);
-		//maybe that helps?
+		//maybe that helps? to force pred to make it harder?
 		//prediction_input p = prediction_input{
 		for (const auto& target : entitylist->get_enemy_heroes())
 		{
@@ -202,6 +203,12 @@ namespace malphite {
 				return;
 			}
 		}
+		// Q
+		if (q->is_ready() && qMenu::autoQHotkey->get_bool()) {
+			auto target = target_selector->get_target(q, damage_type::magical);
+			if (!target) return;
+			q->cast(target);
+		}
 		// E
 		if (e->is_ready()) {
 			int minTargets = eMenu::autoMinTargets->get_int();
@@ -217,6 +224,12 @@ namespace malphite {
 	void combo() {
 		// R
 		if (r->is_ready()){
+			auto selTarget = target_selector->get_selected_target();
+			if (selTarget && rMenu::forceRSelected->get_bool()) {
+				auto predCastPos = rPredictionList[selTarget->get_handle()].get_cast_position();
+				if (predCastPos.distance(myhero) < r->range()) r->cast(predCastPos);
+			}
+
 			int mintargets = rMenu::comboMin->get_int();
 			int mintargetsflash = rMenu::flashComboMin->get_int();
 			if (useRNow) {
@@ -252,7 +265,7 @@ namespace malphite {
 		if (e->is_ready() && eMenu::combo->get_bool()) {
 			for (const auto& target : entitylist->get_enemy_heroes()) {
 				auto pred = ePredictionList[target->get_handle()];
-				if (pred.get_unit_position().distance(myhero) < e->range() && pred.hitchance>hit_chance::impossible) e->cast();
+				if (pred.get_unit_position().distance(myhero) < e->range() && pred.hitchance>hit_chance::impossible && target->is_targetable()) e->cast();
 			}
 		}
 	}
@@ -290,17 +303,19 @@ namespace malphite {
 
 	}
 	void on_draw() {
-		if (drawMenu::drawCircleR->get_bool() && bestRPos.pos != vector() && bestRPos.pos.distance(myhero)<r->range()) 
-		{
-			draw_manager->add_circle(bestRPos.pos, rMenu::radius->get_int(), colorMenu::rCircle->get_color(), 3);
-			draw_manager->add_circle(bestRPos.pos, 5, colorMenu::rCircle->get_color(), 3);
-			draw_manager->add_text(bestRPos.pos, colorMenu::rCircle->get_color(), 50, "%i", bestRPos.hitcount);
-		}
-		if (drawMenu::drawCircleFR->get_bool() && bestFRPos.pos != vector() && bestFRPos.pos.distance(myhero) < r->range()+400 && bestFRPos.hitcount>bestRPos.hitcount)
-		{
-			draw_manager->add_circle(bestFRPos.pos, rMenu::radius->get_int(), colorMenu::frCircle->get_color(), 3);
-			draw_manager->add_circle(bestFRPos.pos, 5, colorMenu::frCircle->get_color(), 3);
-			draw_manager->add_text(bestFRPos.pos, colorMenu::frCircle->get_color(), 50, "%i", bestFRPos.hitcount);
+		if ((r->is_ready() || !drawMenu::drawOnlyReady->get_bool())) {
+			if (drawMenu::drawCircleR->get_bool() && bestRPos.pos != vector() && bestRPos.pos.distance(myhero) < r->range())
+			{
+				draw_manager->add_circle(bestRPos.pos, rMenu::radius->get_int(), colorMenu::rCircle->get_color(), 3);
+				draw_manager->add_circle(bestRPos.pos, 5, colorMenu::rCircle->get_color(), 3);
+				draw_manager->add_text(bestRPos.pos, colorMenu::rCircle->get_color(), 50, "%i", bestRPos.hitcount);
+			}
+			if (drawMenu::drawCircleFR->get_bool() && bestFRPos.pos != vector() && bestFRPos.pos.distance(myhero) < r->range() + 400 && bestFRPos.hitcount > bestRPos.hitcount)
+			{
+				draw_manager->add_circle(bestFRPos.pos, rMenu::radius->get_int(), colorMenu::frCircle->get_color(), 3);
+				draw_manager->add_circle(bestFRPos.pos, 5, colorMenu::frCircle->get_color(), 3);
+				draw_manager->add_text(bestFRPos.pos, colorMenu::frCircle->get_color(), 50, "%i", bestFRPos.hitcount);
+			}
 		}
 	}
 	void on_update() {
@@ -402,7 +417,7 @@ namespace malphite {
 				rMenu::autoMin = rMenu->add_slider("autoMin", "Min Targets to Auto R", 3, 0, 5);
 				rMenu::flashAutoMin = rMenu->add_slider("flashAutoMin", "Min Targets to Auto Flash R", 4, 0, 5);
 				rMenu->add_separator("sep2", "^ 0 to disable ^");
-
+				rMenu::forceRSelected = rMenu->add_checkbox("forceRSelected", "Force R Selected in Combo",true);
 			}
 
 			auto drawMenu = mainMenuTab->add_tab("drawings", "Draw Settings");
