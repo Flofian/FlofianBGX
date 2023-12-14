@@ -26,7 +26,7 @@ namespace malphite {
 	rPos flashRTarget = rPos();
 
 	namespace generalMenu {
-
+		TreeEntry* preventCancel = nullptr;
 	}
 	namespace qMenu {
 		TreeEntry* autoQHotkey = nullptr;
@@ -237,6 +237,8 @@ namespace malphite {
 				return;
 			}
 		}
+		// Anti Auto Cancel and prevent accidental buffering
+		if ((generalMenu::preventCancel->get_bool() && myhero->is_winding_up()) || !myhero->can_cast()) return;
 		// Q
 		if (q->is_ready() && qMenu::combo->get_bool()) {
 			auto target = target_selector->get_target(q, damage_type::magical);
@@ -252,6 +254,8 @@ namespace malphite {
 		}
 	}
 	void harass() {
+		// Anti Auto Cancel and prevent accidental buffering
+		if ((generalMenu::preventCancel->get_bool() && myhero->is_winding_up()) || !myhero->can_cast()) return;
 		// Q
 		if (q->is_ready() && qMenu::harass->get_bool()) {
 			auto target = target_selector->get_target(q, damage_type::magical);
@@ -317,6 +321,14 @@ namespace malphite {
 		if (orbwalker->harass()) harass();
 		automatic();
 	}
+	void on_after_attack_orbwalker(game_object_script target) {
+		if (w->is_ready() && ((orbwalker->combo_mode() && wMenu::combo->get_bool()) || (orbwalker->harass() && wMenu::harass->get_bool() && target->is_ai_hero()))) {
+			w->cast();
+			orbwalker->reset_auto_attack_timer();
+			// TODO: Does that make sense? Feels like it from testing, else i just walk away
+			// Maybe instead issue order for auto attack?
+		}
+	}
 
 	void load() {
 		q = plugin_sdk->register_spell(spellslot::q, 625.f);
@@ -339,7 +351,10 @@ namespace malphite {
 			auto rTexture = myhero->get_spell(spellslot::r)->get_icon_texture();
 			mainMenuTab = menu->create_tab("FlofianMalphite", "Flofian Malphite");
 			mainMenuTab->set_assigned_texture(myhero->get_square_icon_portrait());
-			
+			auto generalMenu = mainMenuTab->add_tab("general", "General Settings");
+			{
+				generalMenu::preventCancel = generalMenu->add_checkbox("preventCancel", "Try to Prevent Auto Cancels", true);
+			}
 			auto qMenu = mainMenuTab->add_tab("Q", "Q Settings");
 			{
 				qMenu->set_assigned_texture(qTexture);
@@ -430,8 +445,8 @@ namespace malphite {
 
 		event_handler<events::on_env_draw>::add_callback(on_env_draw);
 		event_handler<events::on_draw>::add_callback(on_draw);
-
 		event_handler<events::on_update>::add_callback(on_update);
+		event_handler<events::on_after_attack_orbwalker>::add_callback(on_after_attack_orbwalker);
 	}
 
 	void unload() {
@@ -445,5 +460,6 @@ namespace malphite {
 		event_handler<events::on_env_draw>::remove_handler(on_env_draw);
 		event_handler<events::on_draw>::remove_handler(on_draw);
 		event_handler<events::on_update>::remove_handler(on_update);
+		event_handler<events::on_after_attack_orbwalker>::remove_handler(on_after_attack_orbwalker);
 	}
 }
