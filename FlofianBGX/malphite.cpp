@@ -367,7 +367,7 @@ namespace malphite {
 			auto wTexture = myhero->get_spell(spellslot::w)->get_icon_texture();
 			auto eTexture = myhero->get_spell(spellslot::e)->get_icon_texture();
 			auto rTexture = myhero->get_spell(spellslot::r)->get_icon_texture();
-			mainMenuTab = menu->create_tab("FlofianMalphite", "Flofian Malphite");
+			mainMenuTab = menu->create_tab("Flofian_Malphite", "Flofian Malphite");
 			mainMenuTab->set_assigned_texture(myhero->get_square_icon_portrait());
 			auto generalMenu = mainMenuTab->add_tab("general", "General Settings");
 			{

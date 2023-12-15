@@ -144,9 +144,9 @@ namespace nautilus {
 		if (q->is_ready() && qMenu::interrupt->get_bool()) {
 			for (const auto& target : entitylist->get_enemy_heroes()) {
 				if (target && target->is_valid() && target->is_visible() && !target->is_zombie() && target->is_valid_target(q->range()) && Database::getCastingImportance(target)>=2 && !target->get_is_cc_immune()) {
-					auto pred = q->get_prediction(target);
-					if (pred.hitchance >= get_hitchance(qMenu::hitchance->get_int())) {
-						q->cast(pred.get_cast_position());
+					auto castpos = getQCastPos(target);
+					if (castpos != vector()) {
+						q->cast(castpos);
 						if (generalMenu::debug->get_bool()) myhero->print_chat(0, "Interrupt Q on %s hitchance %i", Database::getDisplayName(target).c_str(), pred.hitchance);
 					}
 				}
