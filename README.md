@@ -10,6 +10,14 @@ Thank you to Kiri for making their Permashow open source
 
 [GitHub - Kiirrii/TemplateAIO](https://github.com/Kiirrii/TemplateAIO)
 
+Current Champions:
+
+- Sona
+
+- Nautilus
+
+- Malphite
+
 Possible Future Champs: 
 
 - Nami
