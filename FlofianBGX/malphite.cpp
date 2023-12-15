@@ -45,6 +45,7 @@ namespace malphite {
 	namespace wMenu {
 		TreeEntry* combo = nullptr;
 		TreeEntry* harass = nullptr;
+		TreeEntry* lasthit = nullptr;
 	}
 	namespace eMenu {
 		TreeEntry* range = nullptr;
@@ -186,6 +187,12 @@ namespace malphite {
 			}
 		}
 		
+	}
+
+	bool canGetLasthit(game_object_script minion, float additionalDmg=0, float additionalDelay=0) {
+		float timeToMove = (minion->get_distance(myhero) - myhero->get_attack_range()) / myhero->get_move_speed();
+		float healthPred = health_prediction->get_health_prediction(minion, timeToMove + additionalDelay + myhero->get_attack_cast_delay())-additionalDmg;
+		return healthPred > 0;
 	}
 
 	bool autoQCheck() {
@@ -335,13 +342,12 @@ namespace malphite {
 				}
 			}
 			else {
-				// if we are in always mode, i dont want to q enemies that are then too low for me to lasthit, the 100 is arbitrary, maybe calc how far away it is so i can attack?
 				minions.erase(std::remove_if(minions.begin(), minions.end(), [](game_object_script x)
 					{
 						auto timeToHit = (x->get_distance(myhero) - 100) / 1200;
 						auto predHealth = health_prediction->get_health_prediction(x, timeToHit + 0.25f);
 						auto dmg = q->get_damage(x);
-						return !(predHealth > 0 && (predHealth - dmg > 100 || predHealth - dmg < 0));
+						return !(predHealth > 0 && (canGetLasthit(x, dmg, 0.25f) || predHealth - dmg < 0));
 					}), minions.end());
 			}
 
@@ -352,54 +358,24 @@ namespace malphite {
 			if (minions.size() > 0) q->cast(minions.front());
 		}
 	}
-	// TODO: remove, just for debug
+
 	void drawFarm() {
-		if (!generalMenu::spellfarm->get_bool() || myhero->get_mana_percent() < generalMenu::spellfarmMana->get_int()) return;
-		int qFarmMode = qMenu::farmmode->get_int();
-		if (qFarmMode < 3) {
-			//if qfarm is on
-			auto minions = entitylist->get_enemy_minions();
-			minions.erase(std::remove_if(minions.begin(), minions.end(), [](game_object_script x)
-				{
-					return !x->is_valid_target(q->range());
-				}), minions.end());
-			if (qFarmMode > 0) {
-				//if only lasthit
-				minions.erase(std::remove_if(minions.begin(), minions.end(), [](game_object_script x)
-					{
-						// 1200 = Malphite q speed, rock spawns 100 units in front of malphite, delay=0.25 cast time?
-						auto timeToHit = (x->get_distance(myhero) - 100) / 1200;
-						auto predHealth = health_prediction->get_health_prediction(x, timeToHit + 0.25f);
-						auto dmg = q->get_damage(x);
-						return !(predHealth > 0 && predHealth < dmg);
-					}), minions.end());
-				if (qFarmMode == 2) {
-				minions.erase(std::remove_if(minions.begin(), minions.end(), [](game_object_script x)
-					{
-						return x->get_minion_type() != 6;
-					}), minions.end());
-				}
-			}
-			else {
-				// if we are in always mode, i dont want to q enemies that are then too low for me to lasthit, the 100 is arbitrary, maybe calc how far away it is so i can attack?
-				minions.erase(std::remove_if(minions.begin(), minions.end(), [](game_object_script x)
-					{
-						auto timeToHit = (x->get_distance(myhero) - 100) / 1200;
-						auto predHealth = health_prediction->get_health_prediction(x, timeToHit + 0.25f);
-						auto dmg = q->get_damage(x);
-						return !(predHealth > 0 && (predHealth - dmg > 100 || predHealth-dmg <0));
-					}), minions.end());
-			}
-			
-			for (const auto& minion : minions) {
-				if(minion->is_valid())
-				{
-					draw_manager->add_circle_with_glow(minion->get_position(), MAKE_COLOR(0, 255, 0, 255), minion->get_bounding_radius(), 1, glow_data(0.8, 0.8, 0, 0));
-					draw_manager->add_text(minion->get_position(), MAKE_COLOR(255, 0, 0, 255), 20, "%i", minion->get_minion_type());
-				}
-			}
+		auto minions = entitylist->get_enemy_minions();
+		minions.erase(std::remove_if(minions.begin(), minions.end(), [](game_object_script x)
+			{
+				return !x->is_valid_target(q->range());
+			}), minions.end());
+		// if we are in always mode, i dont want to q enemies that are then too low for me to lasthit, the 100 is arbitrary, maybe calc how far away it is so i can attack?
+		minions.erase(std::remove_if(minions.begin(), minions.end(), [](game_object_script x)
+			{
+				auto timeToHit = (x->get_distance(myhero) - 100) / 1200;
+				auto predHealth = health_prediction->get_health_prediction(x, timeToHit + 0.25f);
+				auto dmg = q->get_damage(x);
+				return !(predHealth > 0 && (canGetLasthit(x, dmg, 0.25f) || predHealth - dmg < 0));
+			}), minions.end());
+		for (const auto& minion : minions) {
+			draw_manager->add_circle_with_glow(minion->get_position(), MAKE_COLOR(0, 255, 0, 255), minion->get_bounding_radius(), 1, glow_data(0.8, 0.8, 0, 0));
 		}
-		
 	}
 
 	void on_env_draw() {
@@ -432,8 +408,7 @@ namespace malphite {
 				draw_manager->add_text(bestFRPos.pos, colorMenu::frCircle->get_color(), 50, "%i", bestFRPos.hitcount);
 			}
 		}
-		// TODO DELETE 
-		drawFarm();
+		//drawFarm();
 	}
 	void on_update() {
 		permashow::instance.update();
@@ -455,13 +430,29 @@ namespace malphite {
 		}
 	}
 
+	void on_unkillable_minion(game_object_script minion) {
+		//console->print("found unkillable minion");
+		if (!generalMenu::spellfarm->get_bool() || myhero->get_mana_percent() < generalMenu::spellfarmMana->get_int() ||!w->is_ready()) return;
+		if (orbwalker->last_hit_mode() || orbwalker->lane_clear_mode()) {
+			if (myhero->is_in_auto_attack_range(minion, 50)) {
+				auto wautodmg = myhero->get_auto_attack_damage(minion) + 20+10*w->level()+0.2f*myhero->get_total_ability_power() +0.15f*myhero->get_armor();
+				auto healthPred = health_prediction->get_health_prediction(minion, myhero->get_attack_cast_delay());
+				if(healthPred > 0 && healthPred-wautodmg<0)
+				{
+					//console->print("used w reset");
+					w->cast();
+					orbwalker->reset_auto_attack_timer();
+				}
+			}
+		}
+	}
+
 	void load() {
 		q = plugin_sdk->register_spell(spellslot::q, 625.f);
 		w = plugin_sdk->register_spell(spellslot::w, 0.f);
 		e = plugin_sdk->register_spell(spellslot::e, 400.f);
 		r = plugin_sdk->register_spell(spellslot::r, 1000.f);
 		r->set_skillshot(0, 325, 1500, {}, skillshot_type::skillshot_circle);
-		
 		
 		if (myhero->get_spell(spellslot::summoner1)->get_spell_data()->get_name_hash() == spell_hash("SummonerFlash"))
 			flash = plugin_sdk->register_spell(spellslot::summoner1, 400.f);
@@ -524,6 +515,8 @@ namespace malphite {
 				wMenu->set_assigned_texture(wTexture);
 				wMenu::combo = wMenu->add_checkbox("combo", "Use W in Combo", true);
 				wMenu::harass = wMenu->add_checkbox("harass", "Use W in Harass", true);
+				wMenu::lasthit = wMenu->add_checkbox("lasthit", "Use W to lasthit", true);
+				wMenu::lasthit->set_tooltip("Only gets used if orb cant get it without w, happens rarely");
 			}
 			auto eMenu = mainMenuTab->add_tab("E", "E Settings");
 			{
@@ -611,6 +604,8 @@ namespace malphite {
 		event_handler<events::on_draw>::add_callback(on_draw);
 		event_handler<events::on_update>::add_callback(on_update);
 		event_handler<events::on_after_attack_orbwalker>::add_callback(on_after_attack_orbwalker);
+		event_handler<events::on_unkillable_minion>::add_callback(on_unkillable_minion);
+
 	}
 
 	void unload() {
@@ -625,5 +620,6 @@ namespace malphite {
 		event_handler<events::on_draw>::remove_handler(on_draw);
 		event_handler<events::on_update>::remove_handler(on_update);
 		event_handler<events::on_after_attack_orbwalker>::remove_handler(on_after_attack_orbwalker);
+		event_handler<events::on_unkillable_minion>::remove_handler(on_unkillable_minion);
 	}
 }
