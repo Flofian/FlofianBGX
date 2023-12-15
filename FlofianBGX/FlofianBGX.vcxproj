@@ -82,6 +82,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
+    <OutDir>..\..\..\AppData\Roaming\fd46cc35c6ffb3fc43ca28ae01ed6a65\plugins\x64</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -162,7 +163,9 @@
     <ClCompile Include="..\plugin_sdk\plugin_sdk.cpp" />
     <ClCompile Include="..\spelldb\SpellDB.cpp" />
     <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="malphite.cpp" />
     <ClCompile Include="nautilus.cpp" />
+    <ClCompile Include="permashow.cpp" />
     <ClCompile Include="sona.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -170,7 +173,9 @@
     <ClInclude Include="..\plugin_sdk\cpplinq.h" />
     <ClInclude Include="..\plugin_sdk\plugin_sdk.hpp" />
     <ClInclude Include="..\spelldb\SpellDB.h" />
+    <ClInclude Include="malphite.h" />
     <ClInclude Include="nautilus.h" />
+    <ClInclude Include="permashow.hpp" />
     <ClInclude Include="sona.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
