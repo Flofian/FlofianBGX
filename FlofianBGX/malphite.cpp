@@ -45,14 +45,16 @@ namespace malphite {
 	}
 	namespace rMenu {
 		TreeEntry* range = nullptr;
-		TreeEntry* radius = nullptr;
-		TreeEntry* hc = nullptr;
 		TreeEntry* comboMin = nullptr;
 		TreeEntry* flashComboMin = nullptr;
 		TreeEntry* autoMin = nullptr;
 		TreeEntry* flashAutoMin = nullptr;
 		TreeEntry* forceRSelected = nullptr;
-
+	}
+	namespace rPredMenu {
+		TreeEntry* radius = nullptr;
+		TreeEntry* hc = nullptr;
+		TreeEntry* predRadius = nullptr;
 	}
 	namespace drawMenu
 	{
@@ -95,30 +97,30 @@ namespace malphite {
 		// and i think if target is 1100 away, pred says impossible, but casting at 1000 still hits
 		int oldrange = r->range();
 		r->set_range(2000);
-		int oldradius = r->radius;
-		r->set_radius(100);
+		//int oldradius = r->radius;
+		//r->set_radius(rPredMenu::predRadius->get_int());
 		//maybe that helps? to force pred to make it harder?
-		//prediction_input p = prediction_input{
 		for (const auto& target : entitylist->get_enemy_heroes())
 		{
 			if (!target->is_valid() || target->is_dead()) continue;
 			rPredictionList[target->get_handle()] = r->get_prediction(target);
+
 			// TODO: Check if thats the true time
 			ePredictionList[target->get_handle()] = prediction->get_prediction(target, 0.2419f);
 		}
 		r->set_range(oldrange);
-		r->set_radius(oldradius);
+		//r->set_radius(oldradius);
 		
 	}
 
 	vector canHitAll(std::vector<game_object_script> enemies) {
 		std::vector<vector> positions = {};
 		for (const auto& target : enemies) {
-			if (rPredictionList[target->get_handle()].hitchance < get_hitchance(rMenu::hc->get_int())) return vector();
+			if (rPredictionList[target->get_handle()].hitchance < get_hitchance(rPredMenu::hc->get_int())) return vector();
 			positions.push_back(rPredictionList[target->get_handle()].get_unit_position());
 		}
 		mec_circle circle = mec::get_mec(positions);
-		if (circle.radius < rMenu::radius->get_int()) return circle.center;
+		if (circle.radius < rPredMenu::radius->get_int()) return circle.center;
 		
 		return vector();
 	}
@@ -129,11 +131,11 @@ namespace malphite {
 		std::vector<game_object_script> enemiesInFlashRRange = {};
 		for (const auto& target : entitylist->get_enemy_heroes()) {
 			// TODO: check spellshield? 
-			if (target && target->is_valid() && target->get_distance(myhero) < rMenu::radius->get_int() + rMenu::range->get_int() + flash->range()
+			if (target && target->is_valid() && target->get_distance(myhero) < rPredMenu::radius->get_int() + rMenu::range->get_int() + flash->range()
 				&& !target->is_dead() && target->is_visible() && target->is_targetable()) {
 
 				enemiesInFlashRRange.push_back(target);
-				if (target->get_distance(myhero) < rMenu::radius->get_int()+ rMenu::range->get_int()) enemiesInRange.push_back(target);
+				if (target->get_distance(myhero) < rPredMenu::radius->get_int()+ rMenu::range->get_int()) enemiesInRange.push_back(target);
 			}
 		}
 		std::vector<std::vector<game_object_script>> subsets = {};
@@ -306,13 +308,13 @@ namespace malphite {
 		if ((r->is_ready() || !drawMenu::drawOnlyReady->get_bool())) {
 			if (drawMenu::drawCircleR->get_bool() && bestRPos.pos != vector() && bestRPos.pos.distance(myhero) < r->range())
 			{
-				draw_manager->add_circle(bestRPos.pos, rMenu::radius->get_int(), colorMenu::rCircle->get_color(), 3);
+				draw_manager->add_circle(bestRPos.pos, rPredMenu::radius->get_int(), colorMenu::rCircle->get_color(), 3);
 				draw_manager->add_circle(bestRPos.pos, 5, colorMenu::rCircle->get_color(), 3);
 				draw_manager->add_text(bestRPos.pos, colorMenu::rCircle->get_color(), 50, "%i", bestRPos.hitcount);
 			}
 			if (drawMenu::drawCircleFR->get_bool() && bestFRPos.pos != vector() && bestFRPos.pos.distance(myhero) < r->range() + 400 && bestFRPos.hitcount > bestRPos.hitcount)
 			{
-				draw_manager->add_circle(bestFRPos.pos, rMenu::radius->get_int(), colorMenu::frCircle->get_color(), 3);
+				draw_manager->add_circle(bestFRPos.pos, rPredMenu::radius->get_int(), colorMenu::frCircle->get_color(), 3);
 				draw_manager->add_circle(bestFRPos.pos, 5, colorMenu::frCircle->get_color(), 3);
 				draw_manager->add_text(bestFRPos.pos, colorMenu::frCircle->get_color(), 50, "%i", bestFRPos.hitcount);
 			}
@@ -322,19 +324,6 @@ namespace malphite {
 		permashow::instance.update();
 		updatePredictionList();
 		updateBestRPos();
-		/*if ((debugkey->get_bool() || useRNow) && r->is_ready()) {
-			if (bestFRPos.pos != bestRPos.pos) {
-				flash->cast(bestFRPos.pos);
-				useRNow = true;
-				//r->cast(bestFRPos.pos);
-			}
-			else {
-				r->cast(bestFRPos.pos);
-				useRNow = false;
-			}
-		}*/
-		//console->print("Center: %f %f %f Hitcount: %i", bestRPos.pos.x, bestRPos.pos.y, bestRPos.pos.z, bestRPos.hitcount);
-
 		if (orbwalker->combo_mode()) combo();
 		if (orbwalker->harass()) harass();
 		automatic();
@@ -406,11 +395,7 @@ namespace malphite {
 				rMenu::range->add_property_change_callback([](TreeEntry* entry) {
 					r->set_range(entry->get_int());
 					});
-				rMenu::radius = rMenu->add_slider("radius", "Radius", 325, 250, 325);
-				rMenu::radius->add_property_change_callback([](TreeEntry* entry) {
-					r->set_radius(entry->get_int());
-					});
-				rMenu::hc = rMenu->add_combobox("Hitchance", "Hitchance", { {"Low", nullptr}, {"Medium", nullptr},{"High", nullptr},{"Very High", nullptr} }, 2);
+				
 				rMenu->add_separator("sep1", "");
 				rMenu::comboMin = rMenu->add_slider("combomin", "Min Targets in Combo", 2, 0, 5);
 				rMenu::flashComboMin = rMenu->add_slider("flashComboMin", "Min  Targets in Combo to Flash R", 3, 0, 5);
@@ -418,6 +403,17 @@ namespace malphite {
 				rMenu::flashAutoMin = rMenu->add_slider("flashAutoMin", "Min Targets to Auto Flash R", 4, 0, 5);
 				rMenu->add_separator("sep2", "^ 0 to disable ^");
 				rMenu::forceRSelected = rMenu->add_checkbox("forceRSelected", "Force R Selected in Combo",true);
+			}
+			auto rPredMenu = rMenu->add_tab("pred", "Prediction Settings");
+			{
+				rPredMenu::radius = rPredMenu->add_slider("radius", "Radius", 325, 250, 325);
+				
+				rPredMenu::hc = rPredMenu->add_combobox("Hitchance", "Hitchance", { {"Low", nullptr}, {"Medium", nullptr},{"High", nullptr},{"Very High", nullptr} }, 2);
+				rPredMenu::predRadius = rPredMenu->add_slider("predRadius", "Prediction Radius", 100, 50, 300);
+				rPredMenu::predRadius->set_tooltip("Default: 100\nSmaller -> Prediction needs to be more certain");
+				rPredMenu::predRadius->add_property_change_callback([](TreeEntry* entry) {
+					r->set_radius(entry->get_int());
+					});
 			}
 
 			auto drawMenu = mainMenuTab->add_tab("drawings", "Draw Settings");
@@ -455,7 +451,7 @@ namespace malphite {
 		{
 			e->set_range(eMenu::range->get_int());
 			r->set_range(rMenu::range->get_int());
-			r->set_radius(rMenu::radius->get_int());
+			r->set_radius(rPredMenu::predRadius->get_int());
 		}
 
 		permashow::instance.init(mainMenuTab);

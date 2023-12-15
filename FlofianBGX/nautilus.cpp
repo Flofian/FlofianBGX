@@ -147,7 +147,7 @@ namespace nautilus {
 					auto castpos = getQCastPos(target);
 					if (castpos != vector()) {
 						q->cast(castpos);
-						if (generalMenu::debug->get_bool()) myhero->print_chat(0, "Interrupt Q on %s hitchance %i", Database::getDisplayName(target).c_str(), pred.hitchance);
+						if (generalMenu::debug->get_bool()) myhero->print_chat(0, "Interrupt Q on %s", Database::getDisplayName(target).c_str());
 					}
 				}
 
