@@ -4,7 +4,7 @@
 
 
 namespace malphite {
-	std::string VERSION = "b.0.0.0";
+	std::string VERSION = "1.0.0";
 	script_spell* q = nullptr;
 	script_spell* w = nullptr;
 	script_spell* e = nullptr;
@@ -620,6 +620,7 @@ namespace malphite {
 			r->set_range(rMenu::range->get_int());
 			r->set_radius(rPredMenu::predRadius->get_int());
 		}
+		mainMenuTab->add_separator("version", "Version: " + VERSION);
 
 		permashow::instance.init(mainMenuTab);
 		permashow::instance.add_element("Spellfarm", generalMenu::spellfarm);
