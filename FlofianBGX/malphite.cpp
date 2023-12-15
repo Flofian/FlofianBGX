@@ -14,6 +14,9 @@ namespace malphite {
 
 	bool useRNow = false;
 
+	bool hasComet = false;
+	bool hasManaflow = false;
+
 	std::unordered_map<uint32_t, prediction_output> ePredictionList;
 	std::unordered_map<uint32_t, prediction_output> rPredictionList;
 
@@ -26,12 +29,18 @@ namespace malphite {
 	rPos flashRTarget = rPos();
 
 	namespace generalMenu {
+		TreeEntry* spellfarm = nullptr;
+		TreeEntry* spellfarmMana = nullptr;
 		TreeEntry* preventCancel = nullptr;
+		TreeEntry* turretCheck = nullptr;
 	}
 	namespace qMenu {
 		TreeEntry* autoQHotkey = nullptr;
 		TreeEntry* combo = nullptr;
 		TreeEntry* harass = nullptr;
+		TreeEntry* autoQManaflow = nullptr;
+		TreeEntry* autoQComet = nullptr;
+		TreeEntry* farmmode = nullptr;
 	}
 	namespace wMenu {
 		TreeEntry* combo = nullptr;
@@ -75,6 +84,7 @@ namespace malphite {
 		TreeEntry* rCircle = nullptr;
 		TreeEntry* frCircle = nullptr;
 	}
+
 	hit_chance get_hitchance(const int hc)
 	{
 		switch (hc)
@@ -112,7 +122,6 @@ namespace malphite {
 		//r->set_radius(oldradius);
 		
 	}
-
 	vector canHitAll(std::vector<game_object_script> enemies) {
 		std::vector<vector> positions = {};
 		for (const auto& target : enemies) {
@@ -124,7 +133,6 @@ namespace malphite {
 		
 		return vector();
 	}
-
 	void updateBestRPos() {
 		//console->print("Updating R");
 		std::vector<game_object_script> enemiesInRange = {};
@@ -180,7 +188,14 @@ namespace malphite {
 		
 	}
 
+	bool autoQCheck() {
+		bool comet = !qMenu::autoQComet->get_bool() || !myhero->has_buff(buff_hash("ASSETS/Perks/Styles/Sorcery/PotentialEnergy/PerkSorceryOutOfCombatCooldownBuff.lua"));
+		bool manaflow = !qMenu::autoQManaflow->get_bool() || !myhero->has_buff(buff_hash("ASSETS/Perks/Styles/Sorcery/ArcaneComet/ArcaneCometRechargeSnipe.lua"));
+		return comet && manaflow;
+	}
+
 	void automatic() {
+		if (generalMenu::turretCheck->get_bool() && myhero->is_under_enemy_turret()) return;
 		if (r->is_ready()) {
 			int mintargets = rMenu::autoMin->get_int();
 			int mintargetsflash = rMenu::flashAutoMin->get_int();
@@ -205,8 +220,10 @@ namespace malphite {
 				return;
 			}
 		}
+		// Anti Auto Cancel and prevent accidental buffering
+		if ((generalMenu::preventCancel->get_bool() && myhero->is_winding_up()) || !myhero->can_cast()) return;
 		// Q
-		if (q->is_ready() && qMenu::autoQHotkey->get_bool()) {
+		if (q->is_ready() && qMenu::autoQHotkey->get_bool() && autoQCheck()) {
 			auto target = target_selector->get_target(q, damage_type::magical);
 			if (!target) return;
 			q->cast(target);
@@ -256,6 +273,7 @@ namespace malphite {
 			}
 		}
 		// Anti Auto Cancel and prevent accidental buffering
+		// TODO: replace with orbwalker->can_move( 0.05f ) ?
 		if ((generalMenu::preventCancel->get_bool() && myhero->is_winding_up()) || !myhero->can_cast()) return;
 		// Q
 		if (q->is_ready() && qMenu::combo->get_bool()) {
@@ -272,8 +290,6 @@ namespace malphite {
 		}
 	}
 	void harass() {
-		// Anti Auto Cancel and prevent accidental buffering
-		if ((generalMenu::preventCancel->get_bool() && myhero->is_winding_up()) || !myhero->can_cast()) return;
 		// Q
 		if (q->is_ready() && qMenu::harass->get_bool()) {
 			auto target = target_selector->get_target(q, damage_type::magical);
@@ -287,6 +303,103 @@ namespace malphite {
 				if (pred.get_unit_position().distance(myhero) < e->range() && pred.hitchance > hit_chance::impossible) e->cast();
 			}
 		}
+	}
+
+	void farm() {
+		if (!generalMenu::spellfarm->get_bool() || myhero->get_mana_percent() < generalMenu::spellfarmMana->get_int()) return;
+		if (!orbwalker->lane_clear_mode() && !orbwalker->last_hit_mode()) return;
+		int qFarmMode = qMenu::farmmode->get_int();
+		if (qFarmMode == 0 && orbwalker->last_hit_mode()) qFarmMode = 1;
+		if (qFarmMode < 3) {
+			//if qfarm is on
+			auto minions = entitylist->get_enemy_minions();
+			minions.erase(std::remove_if(minions.begin(), minions.end(), [](game_object_script x)
+				{
+					return !x->is_valid_target(q->range());
+				}), minions.end());
+			if (qFarmMode > 0) {
+				//if only lasthit
+				minions.erase(std::remove_if(minions.begin(), minions.end(), [](game_object_script x)
+					{
+						// 1200 = Malphite q speed, rock spawns 100 units in front of malphite, 0.25 cast time?
+						auto timeToHit = (x->get_distance(myhero) - 100) / 1200;
+						auto predHealth = health_prediction->get_health_prediction(x, timeToHit +0.25f);
+						auto dmg = q->get_damage(x);
+						return !(predHealth > 0 && predHealth < dmg);
+					}), minions.end());
+				if (qFarmMode == 2) {
+					minions.erase(std::remove_if(minions.begin(), minions.end(), [](game_object_script x)
+						{
+							return x->get_minion_type() != 6;
+						}), minions.end());
+				}
+			}
+			else {
+				// if we are in always mode, i dont want to q enemies that are then too low for me to lasthit, the 100 is arbitrary, maybe calc how far away it is so i can attack?
+				minions.erase(std::remove_if(minions.begin(), minions.end(), [](game_object_script x)
+					{
+						auto timeToHit = (x->get_distance(myhero) - 100) / 1200;
+						auto predHealth = health_prediction->get_health_prediction(x, timeToHit + 0.25f);
+						auto dmg = q->get_damage(x);
+						return !(predHealth > 0 && (predHealth - dmg > 100 || predHealth - dmg < 0));
+					}), minions.end());
+			}
+
+			std::sort(minions.begin(), minions.end(), [](game_object_script a, game_object_script b)
+				{
+					return a->get_health() < b->get_health();
+				});
+			if (minions.size() > 0) q->cast(minions.front());
+		}
+	}
+	// TODO: remove, just for debug
+	void drawFarm() {
+		if (!generalMenu::spellfarm->get_bool() || myhero->get_mana_percent() < generalMenu::spellfarmMana->get_int()) return;
+		int qFarmMode = qMenu::farmmode->get_int();
+		if (qFarmMode < 3) {
+			//if qfarm is on
+			auto minions = entitylist->get_enemy_minions();
+			minions.erase(std::remove_if(minions.begin(), minions.end(), [](game_object_script x)
+				{
+					return !x->is_valid_target(q->range());
+				}), minions.end());
+			if (qFarmMode > 0) {
+				//if only lasthit
+				minions.erase(std::remove_if(minions.begin(), minions.end(), [](game_object_script x)
+					{
+						// 1200 = Malphite q speed, rock spawns 100 units in front of malphite, delay=0.25 cast time?
+						auto timeToHit = (x->get_distance(myhero) - 100) / 1200;
+						auto predHealth = health_prediction->get_health_prediction(x, timeToHit + 0.25f);
+						auto dmg = q->get_damage(x);
+						return !(predHealth > 0 && predHealth < dmg);
+					}), minions.end());
+				if (qFarmMode == 2) {
+				minions.erase(std::remove_if(minions.begin(), minions.end(), [](game_object_script x)
+					{
+						return x->get_minion_type() != 6;
+					}), minions.end());
+				}
+			}
+			else {
+				// if we are in always mode, i dont want to q enemies that are then too low for me to lasthit, the 100 is arbitrary, maybe calc how far away it is so i can attack?
+				minions.erase(std::remove_if(minions.begin(), minions.end(), [](game_object_script x)
+					{
+						auto timeToHit = (x->get_distance(myhero) - 100) / 1200;
+						auto predHealth = health_prediction->get_health_prediction(x, timeToHit + 0.25f);
+						auto dmg = q->get_damage(x);
+						return !(predHealth > 0 && (predHealth - dmg > 100 || predHealth-dmg <0));
+					}), minions.end());
+			}
+			
+			for (const auto& minion : minions) {
+				if(minion->is_valid())
+				{
+					draw_manager->add_circle_with_glow(minion->get_position(), MAKE_COLOR(0, 255, 0, 255), minion->get_bounding_radius(), 1, glow_data(0.8, 0.8, 0, 0));
+					draw_manager->add_text(minion->get_position(), MAKE_COLOR(255, 0, 0, 255), 20, "%i", minion->get_minion_type());
+				}
+			}
+		}
+		
 	}
 
 	void on_env_draw() {
@@ -319,14 +432,19 @@ namespace malphite {
 				draw_manager->add_text(bestFRPos.pos, colorMenu::frCircle->get_color(), 50, "%i", bestFRPos.hitcount);
 			}
 		}
+		// TODO DELETE 
+		drawFarm();
 	}
 	void on_update() {
 		permashow::instance.update();
 		updatePredictionList();
 		updateBestRPos();
 		if (orbwalker->combo_mode()) combo();
-		if (orbwalker->harass()) harass();
 		automatic();
+		// Anti Auto Cancel and prevent accidental buffering, do it after combo/auto to allow r
+		if ((generalMenu::preventCancel->get_bool() && myhero->is_winding_up()) || !myhero->can_cast()) return;
+		if (orbwalker->harass()) harass();
+		farm();
 	}
 	void on_after_attack_orbwalker(game_object_script target) {
 		if (w->is_ready() && ((orbwalker->combo_mode() && wMenu::combo->get_bool()) || (orbwalker->harass() && wMenu::harass->get_bool() && target->is_ai_hero()))) {
@@ -360,14 +478,45 @@ namespace malphite {
 			mainMenuTab->set_assigned_texture(myhero->get_square_icon_portrait());
 			auto generalMenu = mainMenuTab->add_tab("general", "General Settings");
 			{
-				generalMenu::preventCancel = generalMenu->add_checkbox("preventCancel", "Try to Prevent Auto Cancels", true);
+				generalMenu::spellfarm = generalMenu->add_hotkey("spellfarmkey", "Spellfarm", TreeHotkeyMode::Toggle, 0x04, false);
+				generalMenu::spellfarmMana = generalMenu->add_slider("spellfarmmana", "Min Mana % for Spellfarm", 30, 0, 100);
+				generalMenu::preventCancel = generalMenu->add_checkbox("preventCancel", "Try to Prevent Auto Cancels", true); 
+				generalMenu::turretCheck = generalMenu->add_checkbox("TurretCheck", "Dont Auto E/Q under Enemy turret", true);
 			}
 			auto qMenu = mainMenuTab->add_tab("Q", "Q Settings");
 			{
 				qMenu->set_assigned_texture(qTexture);
-				qMenu::autoQHotkey = qMenu->add_hotkey("autoQHotkey", "Auto Q Toggle", TreeHotkeyMode::Hold, 0x05, false);
+				qMenu::autoQHotkey = qMenu->add_hotkey("autoQHotkey", "Auto Q Toggle", TreeHotkeyMode::Toggle, 0x49, false);
 				qMenu::combo = qMenu->add_checkbox("combo", "Use Q in Combo", true);
 				qMenu::harass = qMenu->add_checkbox("harass", "Use Q in Harass", true);
+				qMenu::autoQComet = qMenu->add_checkbox("autoQComet", "Only Auto Q when Comet Ready", true);
+				qMenu::autoQComet->is_hidden() = true;
+				qMenu::autoQManaflow = qMenu->add_checkbox("autoQManaflow", "Only Auto Q when Manaflow Ready", true);
+				qMenu::autoQManaflow->set_tooltip("Gets Ignored if you have it fully stacked");
+				qMenu::autoQManaflow->is_hidden() = true;
+				for (const auto& rune : myhero->get_perks()) {
+					switch (rune->get_id()) {
+					case 8229:
+					{
+						hasComet = true;
+						qMenu::autoQComet->is_hidden() = false;
+						qMenu::autoQComet->set_texture(rune->get_texture());
+						break;
+					}
+					
+					case 8226:
+					{
+						hasManaflow = true;
+						qMenu::autoQManaflow->is_hidden() = false;
+						qMenu::autoQManaflow->set_texture(rune->get_texture());
+						break;
+					}
+					default:
+						break;
+				}
+				}
+
+				qMenu::farmmode = qMenu->add_combobox("farmmode", "Farm Mode", { {"Always", nullptr}, {"Only Lasthit", nullptr},{"Only Lasthit Cannons", nullptr},{"Off", nullptr} }, 2);
 
 			}
 			auto wMenu = mainMenuTab->add_tab("W", "W Settings");
@@ -455,6 +604,7 @@ namespace malphite {
 		}
 
 		permashow::instance.init(mainMenuTab);
+		permashow::instance.add_element("Spellfarm", generalMenu::spellfarm);
 		permashow::instance.add_element("Auto Q", qMenu::autoQHotkey);
 
 		event_handler<events::on_env_draw>::add_callback(on_env_draw);
