@@ -52,6 +52,8 @@ namespace malphite {
 		TreeEntry* combo = nullptr;
 		TreeEntry* harass = nullptr;
 		TreeEntry* autoMinTargets = nullptr;
+		TreeEntry* farmmode = nullptr;
+		TreeEntry* farmMinTargets = nullptr;
 	}
 	namespace rMenu {
 		TreeEntry* range = nullptr;
@@ -315,6 +317,7 @@ namespace malphite {
 	void farm() {
 		if (!generalMenu::spellfarm->get_bool() || myhero->get_mana_percent() < generalMenu::spellfarmMana->get_int()) return;
 		if (!orbwalker->lane_clear_mode() && !orbwalker->last_hit_mode()) return;
+		// Q Farm
 		int qFarmMode = qMenu::farmmode->get_int();
 		if (qFarmMode == 0 && orbwalker->last_hit_mode()) qFarmMode = 1;
 		if (qFarmMode < 3) {
@@ -357,6 +360,26 @@ namespace malphite {
 				});
 			if (minions.size() > 0) q->cast(minions.front());
 		}
+
+		// E Farm
+		int eFarmMode = eMenu::farmmode->get_int();
+		if (eFarmMode > 1) return;
+		int minTargets = eMenu::farmMinTargets->get_int();
+		if (eFarmMode == 1 && !(orbwalker->get_orb_state() & orbwalker_state_flags::fast_lane_clear && orbwalker->lane_clear_mode())) return;
+		// TODO: Decide if this uses the actual e range or the one i set in menu
+		// TODO: Dont e if theres an enemy i cant lasthit anymore?
+		auto eminions = entitylist->get_enemy_minions();
+		eminions.erase(std::remove_if(eminions.begin(), eminions.end(), [](game_object_script x)
+			{
+				return !x->is_valid_target(400);
+			}), eminions.end());
+		eminions.erase(std::remove_if(eminions.begin(), eminions.end(), [](game_object_script x)
+			{
+				auto predHealth = health_prediction->get_health_prediction(x, 0.25f);
+				auto dmg = e->get_damage(x);
+				return !(predHealth > 0 && (canGetLasthit(x, dmg, 0.25f) || predHealth - dmg < 0));
+			}), eminions.end());
+		if (eminions.size() > minTargets) e->cast();
 	}
 
 	void drawFarm() {
@@ -516,7 +539,7 @@ namespace malphite {
 				wMenu::combo = wMenu->add_checkbox("combo", "Use W in Combo", true);
 				wMenu::harass = wMenu->add_checkbox("harass", "Use W in Harass", true);
 				wMenu::lasthit = wMenu->add_checkbox("lasthit", "Use W to lasthit", true);
-				wMenu::lasthit->set_tooltip("Only gets used if orb cant get it without w, happens rarely");
+				wMenu::lasthit->set_tooltip("Only gets used if orb cant get it without w, pls tell me how often its used");
 			}
 			auto eMenu = mainMenuTab->add_tab("E", "E Settings");
 			{
@@ -529,6 +552,8 @@ namespace malphite {
 				eMenu::harass = eMenu->add_checkbox("harass", "Use E in Harass", true);
 				eMenu::autoMinTargets = eMenu->add_slider("autoMinTargets", "Min Targets to Auto E", 2, 0, 5);
 				eMenu::autoMinTargets->set_tooltip("0 to disable");
+				eMenu::farmmode = eMenu->add_combobox("farmmode", "Farm Mode", { {"Always", nullptr}, {"Only Fast Laneclear", nullptr},{"Off", nullptr} }, 1);
+				eMenu::farmMinTargets = eMenu->add_slider("farmtargets", "[Farm] Min Targets", 3, 1, 7);
 			}
 			auto rMenu = mainMenuTab->add_tab("R", "R Settings");
 			{
