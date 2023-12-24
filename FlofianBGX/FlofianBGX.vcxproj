@@ -164,6 +164,7 @@
     <ClCompile Include="..\spelldb\SpellDB.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="malphite.cpp" />
+    <ClCompile Include="nami.cpp" />
     <ClCompile Include="nautilus.cpp" />
     <ClCompile Include="permashow.cpp" />
     <ClCompile Include="sona.cpp" />
@@ -174,6 +175,7 @@
     <ClInclude Include="..\plugin_sdk\plugin_sdk.hpp" />
     <ClInclude Include="..\spelldb\SpellDB.h" />
     <ClInclude Include="malphite.h" />
+    <ClInclude Include="nami.h" />
     <ClInclude Include="nautilus.h" />
     <ClInclude Include="permashow.hpp" />
     <ClInclude Include="sona.h" />

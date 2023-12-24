@@ -37,6 +37,9 @@
     <ClCompile Include="permashow.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="nami.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\plugin_sdk\cpplinq.h">
@@ -61,6 +64,9 @@
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="permashow.hpp">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="nami.h">
       <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>

@@ -20,6 +20,8 @@ Current Champions:
 
 Possible Future Champs: 
 
+- Bard
+
 - Nami
 
 - Ryze?
