@@ -112,6 +112,7 @@ namespace nami {
 	}
 	namespace qMenu {
 		TreeEntry* hc;
+		TreeEntry* mode;
 
 	}
 	namespace wMenu {
@@ -530,6 +531,20 @@ namespace nami {
 		update_spells();
 		// tbh i think i just dont do a combo and a harass method and just do all in here
 
+		if (q->is_ready()) {
+			bool modeCast = (qMenu::mode->get_int() == 0 && orbwalker->harass()) || (qMenu::mode->get_int() <= 1 && orbwalker->combo_mode());
+			if (modeCast) {
+				auto target = target_selector->get_target(q, damage_type::magical);
+				if (target) {
+					auto pred = q->get_prediction(target);
+					if (pred.hitchance >= get_hitchance(qMenu::hc->get_int())) {
+						q->cast(pred.get_cast_position());
+						return;
+					}
+				}
+			}
+
+		}
 
 
 		// W Logic
@@ -622,7 +637,7 @@ namespace nami {
 		if (qInterrupt || rInterrupt) {
 			for (const auto& target : entitylist->get_enemy_heroes()) {
 				if (target && target->is_valid() && target->is_visible() && !target->is_zombie() && target->is_valid_target(r->range()) && !target->get_is_cc_immune()) {
-					if(Database::getCastingImportance(target) >= 3 || rInterrupt)
+					if(Database::getCastingImportance(target) >= 3 && rInterrupt)
 					{
 						if (target->get_champion() == champion_id::Jhin || target->get_champion() == champion_id::Xerath || target->get_champion() == champion_id::Karthus) r->set_range(2750);
 						// ^ I do this because i want to cancel them far away aswell, really hated it when blahajaio tried to cancel katarina r 3 screens away
@@ -634,7 +649,7 @@ namespace nami {
 						}
 						r->set_range(rMenu::range->get_int());
 					}
-					if (Database::getCastingImportance(target) >= 1 || qInterrupt)
+					if (Database::getCastingImportance(target) >= 1 && qInterrupt)
 					{
 						auto pred = q->get_prediction(target);
 						if (pred.hitchance >= get_hitchance(qMenu::hc->get_int()))
@@ -775,6 +790,7 @@ namespace nami {
 		{
 			qMenu->set_assigned_texture(myhero->get_spell(spellslot::q)->get_icon_texture());
 			qMenu::hc = qMenu->add_combobox("Hitchance", "Hitchance", { {"Medium", nullptr},{"High", nullptr},{"Very High", nullptr} }, 2);
+			qMenu::mode = qMenu->add_combobox("mode", "Q Mode", { {"Combo + Harass", nullptr},{"Combo", nullptr}, {"Off", nullptr} }, 0);
 		}
 		auto wMenu = mainMenuTab->add_tab("w", "W Settings");
 		{

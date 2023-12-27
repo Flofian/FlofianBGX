@@ -293,7 +293,7 @@ namespace Database
     {
         auto active = target->get_active_spell();
         if (!active)
-            return false;
+            return 0;
         auto slot = active->get_spellslot();
 
         std::string key;
