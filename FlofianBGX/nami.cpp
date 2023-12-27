@@ -114,7 +114,7 @@ namespace nami {
 
 	}
 	namespace wMenu {
-
+		TreeEntry* minHealRatio = nullptr;
 	}
 	namespace eMenu {
 		TreeEntry* mode = nullptr;
@@ -416,6 +416,11 @@ namespace nami {
 		return false;
 	}
 
+	bool wAllyHeal(game_object_script ally) {
+		float wBaseHeal = 35 + 20 * w->level() + 0.25 * myhero->get_total_ability_power();
+		return ally->get_max_health() - ally->get_health() >= wBaseHeal * wMenu::minHealRatio->get_int() / 100.f;
+	}
+
 	int countWBounces(game_object_script firstTarget) {
 		// Nami w targeting info:
 		// when jumping from ally to enemy -> always takes nearest enemy
@@ -434,7 +439,7 @@ namespace nami {
 			float travelTime = firstTarget->get_distance(myhero) / 2500;
 			auto predictedAllyPos = prediction->get_prediction(firstTarget, travelTime).get_unit_position();
 			auto enemies = entitylist->get_enemy_heroes();
-			int hitCount = (firstTarget->get_max_health() - firstTarget->get_health() > wBaseHeal);
+			int hitCount = wAllyHeal(firstTarget);
 			std::map<uint32_t, vector> firstBouncePredList;
 			for (const auto& enemy : enemies) {
 				firstBouncePredList[enemy->get_network_id()] = prediction->get_prediction(enemy, travelTime).get_unit_position();
@@ -462,7 +467,7 @@ namespace nami {
 			allies.erase(std::remove_if(allies.begin(), allies.end(), [&](game_object_script x)
 				{
 					return !x->is_targetable() || secondBouncePredList[x->get_network_id()].distance(nearestEnemyPos) > bounceRange || 
-						x->get_handle() == firstTarget->get_handle() || firstTarget->get_max_health() - firstTarget->get_health() < wBaseHeal;
+						x->get_handle() == firstTarget->get_handle() || !wAllyHeal(x);
 				}), allies.end());
 			return hitCount + (allies.size() > 0);
 		}
@@ -484,7 +489,7 @@ namespace nami {
 					{
 						return !x->is_targetable() || !x->is_visible() || secondBouncePredList[x->get_network_id()].distance(allyPredPos) > bounceRange ||x->get_handle() == firstTarget->get_handle();
 					}), enemies.end());
-				int currentcount = 1 + (ally->get_max_health() - ally->get_health() > wBaseHeal) + (enemies.size() > 0);
+				int currentcount = 1 + wAllyHeal(ally) + (enemies.size() > 0);
 				// only count the ally if i actually heal, but allow bouncing even if i dont
 				bounceCountList.push_back(currentcount);
 			}
@@ -568,7 +573,7 @@ namespace nami {
 			draw_manager->add_text(ally->get_position(), MAKE_COLOR(255 * (bt <3), 255 * (bt > 1), 0, 255), 30, "%i", bt);
 		}
 		for (const auto& enemy : entitylist->get_enemy_heroes()) {
-			if (enemy->get_distance(myhero) > 725) continue;
+			if (enemy->get_distance(myhero) > 725 || !enemy->is_targetable() || !enemy->is_visible()) continue;
 			int b = countWBounces(enemy);
 			int minb = int(b / 10);
 			int maxb = b % 10;
@@ -676,6 +681,12 @@ namespace nami {
 		auto generalMenu = mainMenuTab->add_tab("general", "General Settings");
 		auto qMenu = mainMenuTab->add_tab("q", "Q Settings");
 		auto wMenu = mainMenuTab->add_tab("w", "W Settings");
+		{
+			wMenu::minHealRatio = wMenu->add_slider("minHealRatio", "Min heal Percent for bounces", 75, 0, 150);
+			wMenu::minHealRatio->set_tooltip("Only Counts bounces to allies if you heal them\n"
+											"If at 100, only count if missingHealth > wHeal\n"
+											"If at 50, only count if you waste half your heal at max");
+		}
 		auto eMenu = mainMenuTab->add_tab("e", "E Settings");
 		{
 			eMenu::mode = eMenu->add_combobox("mode", "E Mode", { {"Always", nullptr}, {"Combo + Harass", nullptr},{"Combo", nullptr}, {"Off", nullptr} }, 0);
