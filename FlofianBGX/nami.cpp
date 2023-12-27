@@ -2,8 +2,11 @@
 #include "nami.h"
 #include "../spelldb/SpellDB.h"
 #include <inttypes.h>
+
+// Warning: This code is ugly
+
 namespace nami {
-	std::string VERSION = "1.0.0";
+	std::string VERSION = "Version: BETA 0.1.0";
 	script_spell* q = nullptr;
 	script_spell* w = nullptr;
 	script_spell* e = nullptr;
@@ -104,8 +107,76 @@ namespace nami {
 	std::vector<circSpell> circularSpells;
 	std::vector<linSpell> linearSpells;
 	std::vector<game_object_script> missileList;
-	
 	std::map<uint32_t, TreeEntry*> wLowHPList;
+
+
+	// thank you yorik100, i love you
+	struct stasisStruct {
+		float stasisTime = 0;
+		float stasisStart = 0;
+		float stasisEnd = 0;
+	};
+	struct buffList {
+		float godBuff = 0;
+		float noKillBuff = 0;
+		stasisStruct stasis = {};
+	};
+	struct particleStruct {
+		game_object_script obj = {};
+		game_object_script target = {};
+		game_object_script owner = {};
+		float time = 0;
+		float castTime = 0;
+		vector castingPos = vector::zero;
+		bool isZed = false;
+		bool isTeleport = false;
+	}; 
+	static constexpr uint32_t godBuffList[]
+	{
+		buff_hash("KayleR"),
+		buff_hash("TaricR"),
+		buff_hash("SivirE"),
+		buff_hash("FioraW"),
+		buff_hash("NocturneShroudofDarkness"),
+		buff_hash("kindredrnodeathbuff"),
+		buff_hash("XinZhaoRRangedImmunity"),
+		buff_hash("PantheonE")
+	};
+
+	static constexpr uint32_t noKillBuffList[]
+	{
+		buff_hash("UndyingRage"),
+		buff_hash("ChronoShift")
+	};
+
+	static constexpr uint32_t stasisBuffList[]
+	{
+		buff_hash("ChronoRevive"),
+		buff_hash("BardRStasis"),
+		buff_hash("ZhonyasRingShield"),
+		buff_hash("LissandraRSelf")
+	}; 
+	static constexpr uint32_t immuneSpells[]
+	{
+		spell_hash("EvelynnR"),
+		spell_hash("ZedR"),
+		spell_hash("EkkoR"),
+		spell_hash("FizzE"),
+		spell_hash("FizzETwo"),
+		spell_hash("FizzEBuffer"),
+		spell_hash("XayahR"),
+		spell_hash("VladimirSanguinePool")
+	};
+
+	std::unordered_map<uint32_t, prediction_output> qPredictionList;
+	std::vector<particleStruct> particlePredList;
+	vector nexusPos;
+	vector urfCannon;
+	std::unordered_map<uint32_t, stasisStruct> stasisInfo;
+	std::unordered_map<uint32_t, float> guardianReviveTime;
+	std::unordered_map<uint32_t, float> deathAnimTime;
+	std::unordered_map<uint32_t, float> godBuffTime;
+	std::unordered_map<uint32_t, float> noKillBuffTime;
 
 	namespace generalMenu {
 		TreeEntry* debug = nullptr;
@@ -114,7 +185,9 @@ namespace nami {
 		TreeEntry* hc;
 		TreeEntry* mode;
 		TreeEntry* onCC;
-
+		TreeEntry* onParticle;
+		TreeEntry* onSpecialSpells;
+		TreeEntry* onStasis;
 	}
 	namespace wMenu {
 		TreeEntry* minHealRatio = nullptr;
@@ -155,6 +228,8 @@ namespace nami {
 		TreeEntry* useR = nullptr;
 		TreeTab* spelldb = nullptr;
 	}
+
+
 
 	std::set<std::string> supportedSpells = {
 		// I want to kill myself
@@ -391,7 +466,7 @@ namespace nami {
 		if (col.size() != 0) {
 			auto c = vector();
 			for (const auto& x : col) {
-				draw_manager->add_circle(x->get_position(), x->get_bounding_radius(), MAKE_COLOR(255, 0, 255, 255));
+				if(drawMenu::drawESpells->get_bool())draw_manager->add_circle(x->get_position(), x->get_bounding_radius(), MAKE_COLOR(255, 0, 255, 255));
 				if (x->get_distance(currentPos) < c.distance(currentPos)) c = x->get_position();
 			}
 			if (c != vector()) endpos = c;
@@ -399,7 +474,7 @@ namespace nami {
 
 		auto rec = geometry::rectangle(currentPos, endpos, radius);
 		bool isInside = rec.to_polygon().is_inside(pos);
-		if (isInside)
+		if (isInside&& drawMenu::drawESpells->get_bool())
 			draw_manager->add_circle(pos, 20, MAKE_COLOR(0, 255, 0, 255));
 		if (!isInside) return -1.f;
 		auto projinfo = pos.project_on(currentPos, endpos);
@@ -435,7 +510,6 @@ namespace nami {
 		float wBaseHeal = 35 + 20 * w->level() + 0.25 * myhero->get_total_ability_power();
 		return ally->get_max_health() - ally->get_health() >= wBaseHeal * wMenu::minHealRatio->get_int() / 100.f;
 	}
-
 	int countWBounces(game_object_script firstTarget) {
 		// Nami w targeting info:
 		// when jumping from ally to enemy -> always takes nearest enemy
@@ -526,11 +600,172 @@ namespace nami {
 		}
 		return hit_chance::medium;
 	}
+	void particleHandling()
+	{
+		
+		const auto particleQ = qMenu::onParticle->get_bool() && q->is_ready();
+
+		// Checking if particles are valid, if they're not, delete them from the list
+		particlePredList.erase(std::remove_if(particlePredList.begin(), particlePredList.end(), [](const particleStruct& x)
+			{
+				return !x.obj->is_valid() || x.owner->is_dead() || x.time + x.castTime <= gametime->get_time();
+			}
+		),
+			particlePredList.end());
+
+		if (!particleQ ||particlePredList.size()==0) return;
+
+		// Loop through every pred particles
+		for (auto& obj : particlePredList)
+		{
+			// Getting the final cast position
+			if (obj.isTeleport)
+			{
+				obj.target = obj.obj->get_particle_attachment_object();
+				if (!obj.target)
+					obj.target = obj.obj->get_particle_target_attachment_object();
+				if (obj.target && obj.obj->get_position().distance(obj.target->get_position()) <= 0) {
+					obj.castingPos = obj.target->get_position().extend(nexusPos, obj.target->is_ai_turret() ? 225 : 100);
+				}
+				else
+				{
+					obj.castingPos = obj.obj->get_position().extend(nexusPos, 100);
+				}
+				if (obj.castingPos.is_wall() || obj.castingPos.is_building())
+					obj.castingPos = navmesh->get_nearest_passable_cell_center(obj.castingPos);
+			}
+			else if (obj.isZed)
+			{
+				obj.castingPos = obj.target->get_position() + (obj.owner->get_direction() * 75);
+				if (obj.castingPos.is_wall() || obj.castingPos.is_building())
+					obj.castingPos = navmesh->get_nearest_passable_cell_center(obj.castingPos);
+			}
+
+			// Check if cast position isn't too far enough
+			if (myhero->get_position().distance(obj.castingPos) > q->range() + q->get_radius()) continue;
+
+			// Gathering enough data to cast on particles
+			float pings = ping->get_ping() / 1000.f;
+			const auto particleTime = (obj.time + obj.castTime) - gametime->get_time();
+			const auto effectiveQRange = q->range() + q->radius;
+			const auto effectiveQRadius = myhero->get_position().distance(obj.castingPos) <= q->range() ? q->radius : std::max(1.f, q->radius + q->range() - myhero->get_position().distance(obj.castingPos));
+			const auto effectiveQDeviation = q->radius - effectiveQRadius;
+			const auto qCanDodge = obj.owner->get_move_speed() * ((q->get_delay() - particleTime) + pings) > effectiveQRadius;
+			const auto canQ = particleQ && !qCanDodge && myhero->get_position().distance(obj.castingPos) <= effectiveQRange;
+			
+		
+			// Try to cast Q if possible
+			if (canQ && (particleTime - pings + 0.2) <= q->get_delay())
+			{
+				q->cast(obj.castingPos.extend(myhero->get_position(), effectiveQDeviation));
+				return;
+			}
+		}
+	}
+	int isCastMoving(const game_object_script& target)
+	{
+		if (!target->is_ai_hero())
+			return 0;
+		if (target->get_spell(spellslot::w)->get_name_hash() == spell_hash("NunuW_Recast") && target->is_playing_animation(buff_hash("Spell2")))
+			return 2;
+		if (target->get_spell(spellslot::w)->get_name_hash() == spell_hash("AurelionSolWToggle") && target->is_playing_animation(buff_hash("Spell2")))
+			return 2;
+		if (target->get_spell(spellslot::r)->get_name_hash() == spell_hash("SionR") && target->has_buff(buff_hash("SionR")))
+			return 1;
+		return 0;
+	}
+	buffList combinedBuffChecks(const game_object_script& target)
+	{
+		// This function gets every single buffs that are needed making the 3 functions above completely useless!
+		float godBuffTime = 0;
+		float noKillBuffTime = 0;
+		float stasisTime = 0;
+		float stasisStart = 0;
+		float stasisEnd = 0;
+		for (auto&& buff : target->get_bufflist())
+		{
+			if (buff == nullptr || !buff->is_valid() || !buff->is_alive()) continue;
+
+			const auto buffHash = buff->get_hash_name();
+			if (std::find(std::begin(godBuffList), std::end(godBuffList), buffHash) != std::end(godBuffList))
+			{
+				const auto isPantheonE = buffHash == buff_hash("PantheonE");
+				const auto realRemainingTime = !isPantheonE ? buff->get_remaining_time() : buff->get_remaining_time() + 0.2;
+				if (godBuffTime < realRemainingTime && (!isPantheonE || target->is_facing(myhero)) && (buffHash != buff_hash("XinZhaoRRangedImmunity") || myhero->get_position().distance(target->get_position()) > 450))
+				{
+					godBuffTime = realRemainingTime;
+				}
+			}
+			else if (std::find(std::begin(noKillBuffList), std::end(noKillBuffList), buffHash) != std::end(noKillBuffList))
+			{
+				if (noKillBuffTime < buff->get_remaining_time())
+				{
+					noKillBuffTime = buff->get_remaining_time();
+				}
+			}
+			else if (std::find(std::begin(stasisBuffList), std::end(stasisBuffList), buffHash) != std::end(stasisBuffList))
+			{
+				if (stasisTime < buff->get_remaining_time())
+				{
+					stasisTime = buff->get_remaining_time();
+					stasisStart = buff->get_start();
+					stasisEnd = buff->get_end();
+				}
+			}
+		}
+		// Get guardian angel revive time if there is one
+		if (stasisTime > 0)
+			guardianReviveTime[target->get_handle()] = 0.f;
+		const auto reviveTime = guardianReviveTime[target->get_handle()];
+		const float GATime = (stasisTime <= 0 && reviveTime ? reviveTime - gametime->get_time() : 0);
+		if (stasisTime < GATime)
+		{
+			stasisTime = GATime;
+			stasisStart = reviveTime - 4;
+			stasisEnd = reviveTime;
+		}
+		const stasisStruct& stasisInfo = { .stasisTime = stasisTime, .stasisStart = stasisStart, .stasisEnd = stasisEnd };
+		const buffList& buffStruct = { .godBuff = godBuffTime, .noKillBuff = noKillBuffTime, .stasis = stasisInfo };
+		return buffStruct;
+	}
+	bool isYuumiAttached(const game_object_script& target)
+	{
+		// Check if the target is Yuumi and if it's attached to someone
+		return target->is_ai_hero() && target->get_spell(spellslot::w)->get_name_hash() == spell_hash("YuumiWEndWrapper");
+	}
+	bool customIsValid(const game_object_script& target, float range = FLT_MAX, vector from = vector::zero, bool invul = false)
+	{
+		// Custom isValid
+		if (!target || !target->is_valid())
+			return false;
+
+		// If it's Yuumi that is attached then target is not valid
+		if (isYuumiAttached(target)) return false;
+
+		if (from == vector::zero)
+			from = myhero->get_position();
+
+		//if (ferris_prediction && ferris_prediction->is_hidden() == false && settings::automatic::fowPred->get_bool() && prediction->get_prediction(target, 0.F).hitchance > hit_chance::impossible && from.distance(target) <= range)
+		//	return true;
+
+		const auto isCastingImmortalitySpell = (target->get_active_spell() && std::find(std::begin(immuneSpells), std::end(immuneSpells), target->get_active_spell()->get_spell_data()->get_name_hash()) != std::end(immuneSpells)) || target->has_buff(buff_hash("AkshanE2"));
+		const auto isValid = !isCastingImmortalitySpell && ((target->is_valid_target(range, from, invul) && target->is_targetable() && target->is_targetable_to_team(myhero->get_team()) && !target->is_invulnerable()));
+		return isValid;
+	}
 
 	void on_update() {
 		// TODO: either give user control or just use either min or max
 		update_spells();
 		// tbh i think i just dont do a combo and a harass method and just do all in here
+		for (const auto& enemy : entitylist->get_enemy_heroes()) {
+			qPredictionList[enemy->get_handle()] = q->get_prediction(enemy);
+			// man thank you yorik
+			const buffList listOfNeededBuffs = combinedBuffChecks(enemy);
+			godBuffTime[enemy->get_handle()] = listOfNeededBuffs.godBuff;
+			noKillBuffTime[enemy->get_handle()] = listOfNeededBuffs.noKillBuff;
+			stasisInfo[enemy->get_handle()] = listOfNeededBuffs.stasis;
+		}
+
 
 		if (q->is_ready()) {
 			// Combo/Harass Cast
@@ -538,7 +773,7 @@ namespace nami {
 			if (modeCast) {
 				auto target = target_selector->get_target(q, damage_type::magical);
 				if (target) {
-					auto pred = q->get_prediction(target);
+					auto pred = qPredictionList[target->get_handle()];
 					if (pred.hitchance >= get_hitchance(qMenu::hc->get_int())) {
 						q->cast(pred.get_cast_position());
 						return;
@@ -547,16 +782,42 @@ namespace nami {
 			}
 			// Auto Q
 			for (const auto& target : entitylist->get_enemy_heroes()) {
-				if (!target || !target->is_valid_target(q->range()) || target->is_dead() || !target->is_visible() || target->get_is_cc_immune()) continue;
-				// On CC
-				if (qMenu::onCC->get_bool() && target->get_immovibility_time() > q->delay)
+				if (!target || !target->is_valid() || target->get_distance(myhero)>q->range()) return;
+				auto pred = qPredictionList[target->get_handle()];
+				
+				if (qMenu::onStasis->get_bool())
 				{
-					q->cast(target);
+					const auto stasisDuration = stasisInfo[target->get_handle()].stasisTime;
+					if (!((customIsValid(target) || stasisDuration > 0) && !target->is_zombie())) return;
+					if (stasisDuration>0 && (stasisDuration + 0.2 - ping->get_ping() / 1000.f) < q->delay) {
+						q->cast(pred.get_cast_position());
+					}
+				}
+				if (!target->is_valid_target(q->range(), vector(), true) || target->is_dead() || !target->is_visible() || target->get_is_cc_immune()) continue;
+				
+				// On CC
+				if (qMenu::onCC->get_bool() && target->get_immovibility_time() > q->delay && pred.hitchance>=hit_chance::low)
+				{
+					q->cast(pred.get_cast_position());
 					return;
 				}
+				// Special Spell
+				if (qMenu::onSpecialSpells->get_bool()) {
+					auto activeSpell = target->get_active_spell();
+					if (!activeSpell || activeSpell->get_spell_data()->is_insta() || activeSpell->get_spell_data()->mCanMoveWhileChanneling() || isCastMoving(target)) return;
+					auto castStartTime = activeSpell->cast_start_time();
+					auto castTime = activeSpell->get_spell_data()->mCastTime();
+					auto remainingTime = castStartTime - gametime->get_time() + castTime;
+					if (remainingTime > 0.8 && pred.hitchance>=hit_chance::low) {	// should be enough, not sure if there are any other than luxR and ezrealR
+						q->cast(pred.get_cast_position());
+					}
+				}
+				// Stasis
+
 			}
-
-
+			// particle Stuff
+			if (!particlePredList.empty())
+				particleHandling();
 		}
 
 
@@ -740,13 +1001,21 @@ namespace nami {
 	}
 
 	void on_process_spell_cast(game_object_script sender, spell_instance_script spell) {
-		if (!sender->is_ai_hero() || !sender->is_ally()) return;
-		auto name = spell->get_spell_data()->get_name();
-		//console->print(name.c_str());
-		auto circIterator = circSpellDB.find(spell->get_spell_data()->get_name_hash());
-		if (circIterator != circSpellDB.end())
+		if (sender->is_ai_hero() && sender->is_ally())
 		{
-			circularSpells.push_back(circSpell(spell->get_cast_position(), spell->get_end_position(), spell->get_spell_data()->get_name_hash(), sender, spell->get_spellslot()));
+			//console->print(spell->get_spell_data()->get_name_cstr());
+			auto circIterator = circSpellDB.find(spell->get_spell_data()->get_name_hash());
+			if (circIterator != circSpellDB.end())
+			{
+				circularSpells.push_back(circSpell(spell->get_cast_position(), spell->get_end_position(), spell->get_spell_data()->get_name_hash(), sender, spell->get_spellslot()));
+			}
+		}
+		if (qMenu::onSpecialSpells->get_bool() && sender->is_ai_hero() && sender->is_enemy()) {
+			// I do this only in here because fioraW lasts 0.75s and my q takes 0.99s, so if i dont cast immediatly she will likely escape
+			if (spell->get_spell_data()->get_name_hash() == spell_hash("FioraW")) {
+				auto pred = q->get_prediction(sender);
+				if (pred.hitchance >= hit_chance::low) q->cast(pred.get_cast_position());	// Hardcoding since i dont need more? but i need atleast something so its not out of range
+			}
 		}
 		
 	}
@@ -770,6 +1039,87 @@ namespace nami {
 				console->print("Start Accel: %f", obj->missile_movement_get_acceleration_magnitude());
 				console->print("Target: %s", obj->missile_movement_get_target_unit()->get_model_cstr());
 			}*/
+		}
+
+		const auto object_hash = spell_hash_real(obj->get_name_cstr());
+		const auto emitterHash = obj->get_emitter_resources_hash();
+
+		// I <3 yorik100
+		if (!obj->get_emitter() || !obj->get_emitter()->is_enemy() || !obj->get_emitter()->is_ai_hero()) return;
+
+		switch (emitterHash)
+		{
+		case buff_hash("TwistedFate_R_Gatemarker_Red"):
+		{
+			const particleStruct& particleData = { .obj = obj, .owner = obj->get_emitter(), .time = gametime->get_time(), .castTime = 1.5, .castingPos = obj->get_position() };
+			particlePredList.push_back(particleData);
+			return;
+		}
+		case buff_hash("Ekko_R_ChargeIndicator"):
+		{
+			const particleStruct& particleData = { .obj = obj, .owner = obj->get_emitter(), .time = gametime->get_time(), .castTime = 0.5, .castingPos = obj->get_position() };
+			particlePredList.push_back(particleData);
+			return;
+		}
+		case buff_hash("Pantheon_R_Update_Indicator_Enemy"):
+		{
+			const auto castPos = obj->get_position() + obj->get_particle_rotation_forward() * 1350;
+			const particleStruct& particleData = { .obj = obj, .owner = obj->get_emitter(), .time = gametime->get_time(), .castTime = 2.2, .castingPos = castPos };
+			particlePredList.push_back(particleData);
+			return;
+		}
+		case buff_hash("Galio_R_Tar_Ground_Enemy"):
+		{
+			const particleStruct& particleData = { .obj = obj, .owner = obj->get_emitter(), .time = gametime->get_time(), .castTime = 2.75, .castingPos = obj->get_position() };
+			particlePredList.push_back(particleData);
+			return;
+		}
+		case buff_hash("Evelynn_R_Landing"):
+		{
+			const particleStruct& particleData = { .obj = obj, .owner = obj->get_emitter(), .time = gametime->get_time(), .castTime = 0.85, .castingPos = obj->get_position() };
+			particlePredList.push_back(particleData);
+			return;
+		}
+		case buff_hash("TahmKench_W_ImpactWarning_Enemy"):
+		{
+			const particleStruct& particleData = { .obj = obj, .owner = obj->get_emitter(), .time = gametime->get_time(), .castTime = 0.8, .castingPos = obj->get_position() };
+			particlePredList.push_back(particleData);
+			return;
+		}
+		case buff_hash("Zed_R_tar_TargetMarker"):
+			if (obj->get_particle_attachment_object() && obj->get_particle_attachment_object()->get_handle() == myhero->get_handle())
+			{
+				const particleStruct& particleData = { .obj = obj, .target = obj->get_particle_attachment_object(), .owner = obj->get_emitter(), .time = gametime->get_time(), .castTime = 0.95, .castingPos = vector::zero, .isZed = true };
+				particlePredList.push_back(particleData);
+				return;
+			}
+		case 1882371666:
+		{
+			const particleStruct& particleData = { .obj = obj, .target = obj->get_particle_attachment_object(), .owner = obj->get_emitter(), .time = gametime->get_time(), .castTime = obj->get_position().distance(urfCannon) / 2800, .castingPos = obj->get_position() };
+			particlePredList.push_back(particleData);
+			return;
+		}
+		}
+
+		if (object_hash == spell_hash("global_ss_teleport_turret_red.troy"))
+		{
+			const auto& target = obj->get_particle_attachment_object();
+			if (nexusPos != vector::zero)
+			{
+				const particleStruct& particleData = { .obj = obj, .target = target, .owner = obj->get_emitter(), .time = gametime->get_time(), .castTime = 4.f, .castingPos = vector::zero, .isTeleport = true };
+				particlePredList.push_back(particleData);
+				return;
+			}
+		}
+		else if (object_hash == spell_hash("global_ss_teleport_target_red.troy"))
+		{
+			const auto& target = obj->get_particle_target_attachment_object();
+			if (nexusPos != vector::zero)
+			{
+				const particleStruct& particleData = { .obj = obj, .target = target, .owner = obj->get_emitter(), .time = gametime->get_time(), .castTime = 4.f, .castingPos = vector::zero, .isTeleport = true };
+				particlePredList.push_back(particleData);
+				return;
+			}
 		}
 	}
 	void on_delete_object(game_object_script obj) {
@@ -806,6 +1156,12 @@ namespace nami {
 			qMenu::mode = qMenu->add_combobox("mode", "Q Mode", { {"Combo + Harass", nullptr},{"Combo", nullptr}, {"Off", nullptr} }, 0);
 			qMenu->add_separator("sep1", "Auto Q");
 			qMenu::onCC = qMenu->add_checkbox("oncc", "On CC", true);
+			qMenu::onParticle = qMenu->add_checkbox("onParticle", "On Teleport-like Spells", true);
+			qMenu::onParticle->set_tooltip("Teleport, TwistedFate R, TahmKench W, etc");
+			qMenu::onSpecialSpells = qMenu->add_checkbox("onSpecialSpells", "On Special Spells", true);
+			qMenu::onSpecialSpells->set_tooltip("Fiora W, Long cast times");
+			qMenu::onStasis = qMenu->add_checkbox("onStasis", "On Stasis", true);
+			
 		}
 		auto wMenu = mainMenuTab->add_tab("w", "W Settings");
 		{
@@ -976,6 +1332,17 @@ namespace nami {
 		event_handler<events::on_process_spell_cast>::add_callback(on_process_spell_cast);
 		event_handler<events::on_create_object>::add_callback(on_create_object);
 		event_handler<events::on_delete_object>::add_callback(on_delete_object);
+
+		const auto nexusPosIt = std::find_if(entitylist->get_all_nexus().begin(), entitylist->get_all_nexus().end(), [](const game_object_script& x) { return x != nullptr && x->is_valid() && x->is_enemy(); });
+		if (nexusPosIt != entitylist->get_all_nexus().end())
+		{
+			const auto& nexusEntity = *nexusPosIt;
+			if (nexusEntity->is_valid())
+				nexusPos = nexusEntity->get_position();
+		}
+		urfCannon = myhero->get_team() == game_object_team::order ? vector(13018.f, 14026.f) : vector(1506.f, 676.f);
+		mainMenuTab->add_separator("version", VERSION);
+		mainMenuTab->add_separator("sep1", "Special Thanks to yorik100");
 	}
 	void unload() {
 		plugin_sdk->remove_spell(q);
