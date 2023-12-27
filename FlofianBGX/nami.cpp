@@ -175,6 +175,7 @@ namespace nami {
 		"JinxR",
 		"KaisaW",
 		"KalistaQ",
+		"KennenQ",
 		"KogMawQ",
 		"KogMawE",
 		"LeblancE",
@@ -190,6 +191,7 @@ namespace nami {
 		"RyzeQ",
 		"SamiraQ",
 		"SivirQ",
+		"SkarnerE",
 		"TwistedFateQ",
 		"VarusQ",
 		"VarusR",
@@ -205,7 +207,8 @@ namespace nami {
 		"ZeriQ",
 		"ZeriW",
 		"ZoeQ",
-		"ZoeE"
+		"ZoeE",
+		"ZyraE"
 	};
 	std::string spellSlotName(spellslot s) {
 		switch (s)
@@ -289,7 +292,7 @@ namespace nami {
 		// Jinx R Speed Changes, but it gets faster, so if my func says it will hit then it definitly hits
 		linSpellDB[spell_hash("KaisaW")] = linSpellData(100, 1750, { collisionable_objects::yasuo_wall, collisionable_objects::minions }, spellslot::w);
 		linSpellDB[spell_hash("KalistaMysticShotMisTrue")] = linSpellData(40, 2400, { collisionable_objects::yasuo_wall, collisionable_objects::minions }, spellslot::q);
-		// TODO: account with kennen for q
+		linSpellDB[spell_hash("KennenShurikenHurlMissile1")] = linSpellData(50, 1700, { collisionable_objects::yasuo_wall, collisionable_objects::minions }, spellslot::q);
 		linSpellDB[spell_hash("KogMawQ")] = linSpellData(70, 1650, { collisionable_objects::yasuo_wall, collisionable_objects::minions }, spellslot::q);
 		linSpellDB[spell_hash("KogMawVoidOozeMissile")] = linSpellData(120, 1400, { collisionable_objects::yasuo_wall }, spellslot::e);
 		linSpellDB[spell_hash("LeblancEMissile")] = linSpellData(55, 1750, { collisionable_objects::yasuo_wall, collisionable_objects::minions }, spellslot::e);
@@ -315,7 +318,7 @@ namespace nami {
 		// Seraphine E
 		linSpellDB[spell_hash("SivirQMissile")] = linSpellData(90, 1450, { collisionable_objects::yasuo_wall }, spellslot::q);
 		linSpellDB[spell_hash("SivirQMissileReturn")] = linSpellData(100, 1200, { collisionable_objects::yasuo_wall }, spellslot::q);
-		// Skarner Q
+		linSpellDB[spell_hash("SkarnerFractureMissile")] = linSpellData(70, 1500, { collisionable_objects::yasuo_wall }, spellslot::e);
 		// Swain? Q E
 		// Slyas E Decelerates
 		// Tahm Kench Q Size depends on champ size
@@ -344,7 +347,7 @@ namespace nami {
 		linSpellDB[spell_hash("ZoeQMissile")] = linSpellData(50, 1200, { collisionable_objects::yasuo_wall, collisionable_objects::minions }, spellslot::q);
 		linSpellDB[spell_hash("ZoeQMis2")] = linSpellData(70, 2500, { collisionable_objects::yasuo_wall, collisionable_objects::minions }, spellslot::q);
 		linSpellDB[spell_hash("ZoeEMis")] = linSpellData(50, 1850, { collisionable_objects::yasuo_wall, collisionable_objects::minions }, spellslot::e);
-		// Zyra E
+		linSpellDB[spell_hash("ZyraE")] = linSpellData(70, 1150, { collisionable_objects::yasuo_wall }, spellslot::e);
 	}
 	void update_spells() {
 		circularSpells.erase(std::remove_if(circularSpells.begin(), circularSpells.end(), [](circSpell x)
