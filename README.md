@@ -1,3 +1,5 @@
+Join my [Discord](https://discord.gg/dURC8dsFUr) for announcments
+
 Interrupt Database based on Omori SpellDB
 
 [GitHub - BGXBreaker/BGXAddons](https://github.com/BGXBreaker/BGXAddons)
@@ -18,9 +20,11 @@ Current Champions:
 
 - Malphite
 
-Possible Future Champs: 
+Work in Progress:
 
 - Nami
+
+Possible Future Champs: 
 
 - Ryze?
 
