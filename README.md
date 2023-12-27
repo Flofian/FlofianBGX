@@ -1,4 +1,4 @@
-Join my [Discord](https://discord.gg/dURC8dsFUr) for announcments
+Join my [Discord](https://discord.gg/dURC8dsFUr) for announcements
 
 Interrupt Database based on Omori SpellDB
 
