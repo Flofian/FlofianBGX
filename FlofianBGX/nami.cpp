@@ -10,7 +10,6 @@ namespace nami {
 	script_spell* r = nullptr;
 
 	TreeTab* mainMenuTab = nullptr;
-	TreeTab* spelldb = nullptr;
 
 	std::map<std::string, TreeTab*> eDB;
 	float GLOBALSCALINGFACTOR = 1.0f;
@@ -112,6 +111,7 @@ namespace nami {
 		TreeEntry* debug = nullptr;
 	}
 	namespace qMenu {
+		TreeEntry* hc;
 
 	}
 	namespace wMenu {
@@ -128,9 +128,10 @@ namespace nami {
 		TreeEntry* remainingTime = nullptr;
 	}
 	namespace rMenu {
-
-	}namespace drawMenu
-	{
+		TreeEntry* range = nullptr;
+		TreeEntry* hc = nullptr;
+	}
+	namespace drawMenu {
 		TreeEntry* drawOnlyReady = nullptr;
 		TreeEntry* drawRangeQ = nullptr;
 		TreeEntry* drawRangeW = nullptr;
@@ -147,6 +148,12 @@ namespace nami {
 		TreeEntry* eSpellColor = nullptr;
 		TreeEntry* rColor = nullptr;
 	}
+	namespace interruptMenu {
+		TreeEntry* useQ = nullptr;
+		TreeEntry* useR = nullptr;
+		TreeTab* spelldb = nullptr;
+	}
+
 	std::set<std::string> supportedSpells = {
 		// I want to kill myself
 		"BrandW",
@@ -504,12 +511,26 @@ namespace nami {
 		}
 		return 0;
 	}
-
+	hit_chance get_hitchance(const int hc)
+	{
+		switch (hc)
+		{
+		case 0:
+			return hit_chance::medium;
+		case 1:
+			return hit_chance::high;
+		case 2:
+			return hit_chance::very_high;
+		}
+		return hit_chance::medium;
+	}
 
 	void on_update() {
 		// TODO: either give user control or just use either min or max
 		update_spells();
 		// tbh i think i just dont do a combo and a harass method and just do all in here
+
+
 
 		// W Logic
 		if (w->is_ready())
@@ -592,6 +613,40 @@ namespace nami {
 				if (spellName == "") return;
 				bool isEnabled = tab->get_entry(spellName)->get_int() == 1;
 				if (isEnabled) e->cast(sender);
+			}
+		}
+
+		// Interrupt Logic
+		bool qInterrupt = interruptMenu::useQ->get_bool() && q->is_ready();
+		bool rInterrupt = interruptMenu::useR->get_bool() && r->is_ready();
+		if (qInterrupt || rInterrupt) {
+			for (const auto& target : entitylist->get_enemy_heroes()) {
+				if (target && target->is_valid() && target->is_visible() && !target->is_zombie() && target->is_valid_target(r->range()) && !target->get_is_cc_immune()) {
+					if(Database::getCastingImportance(target) >= 3 || rInterrupt)
+					{
+						if (target->get_champion() == champion_id::Jhin || target->get_champion() == champion_id::Xerath || target->get_champion() == champion_id::Karthus) r->set_range(2750);
+						// ^ I do this because i want to cancel them far away aswell, really hated it when blahajaio tried to cancel katarina r 3 screens away
+						auto pred = r->get_prediction(target);
+						if(pred.hitchance >= get_hitchance(rMenu::hc->get_int()))
+						{
+							r->cast(target);
+							if (generalMenu::debug->get_bool()) myhero->print_chat(0, "Interrupt R on %s", Database::getDisplayName(target).c_str());
+						}
+						r->set_range(rMenu::range->get_int());
+					}
+					if (Database::getCastingImportance(target) >= 1 || qInterrupt)
+					{
+						auto pred = q->get_prediction(target);
+						if (pred.hitchance >= get_hitchance(qMenu::hc->get_int()))
+						{
+							q->cast(target);
+							if (generalMenu::debug->get_bool()) myhero->print_chat(0, "Interrupt Q on %s", Database::getDisplayName(target).c_str());
+						}
+					}
+
+
+				}
+
 			}
 		}
 	}	
@@ -713,9 +768,17 @@ namespace nami {
 		mainMenuTab = menu->create_tab("Flofian_Nami", "Flofian Nami");
 		mainMenuTab->set_assigned_texture(myhero->get_square_icon_portrait());
 		auto generalMenu = mainMenuTab->add_tab("general", "General Settings");
+		{
+			generalMenu::debug = generalMenu->add_checkbox("debug", "Debug Prints", true);
+		}
 		auto qMenu = mainMenuTab->add_tab("q", "Q Settings");
+		{
+			qMenu->set_assigned_texture(myhero->get_spell(spellslot::q)->get_icon_texture());
+			qMenu::hc = qMenu->add_combobox("Hitchance", "Hitchance", { {"Medium", nullptr},{"High", nullptr},{"Very High", nullptr} }, 2);
+		}
 		auto wMenu = mainMenuTab->add_tab("w", "W Settings");
 		{
+			wMenu->set_assigned_texture(myhero->get_spell(spellslot::w)->get_icon_texture());
 			wMenu::minHealRatio = wMenu->add_slider("minHealRatio", "Min heal Percent for bounces", 75, 0, 150);
 			wMenu::minHealRatio->set_tooltip("Only Counts bounces to allies if you heal them\n"
 											"If at 100, only count if missingHealth > wHeal\n"
@@ -733,6 +796,7 @@ namespace nami {
 		}
 		auto eMenu = mainMenuTab->add_tab("e", "E Settings");
 		{
+			eMenu->set_assigned_texture(myhero->get_spell(spellslot::e)->get_icon_texture());
 			eMenu::mode = eMenu->add_combobox("mode", "E Mode", { {"Always", nullptr}, {"Combo + Harass", nullptr},{"Combo", nullptr}, {"Off", nullptr} }, 0);
 			eMenu::useOn = eMenu->add_tab("useOn", "Use E on:");
 			for (const auto& ally : entitylist->get_ally_heroes()) {
@@ -821,6 +885,15 @@ namespace nami {
 				});
 		}
 		auto rMenu = mainMenuTab->add_tab("r", "R Settings");
+		{
+			rMenu->set_assigned_texture(myhero->get_spell(spellslot::r)->get_icon_texture()); 
+			rMenu::range = rMenu->add_slider("range", "Range", 1500, 1000, 2750);
+			rMenu::range->add_property_change_callback([](TreeEntry* entry) {
+				r->set_range(entry->get_int());
+				});
+			r->set_range(rMenu::range->get_int());// when loading
+			rMenu::hc = rMenu->add_combobox("Hitchance", "Hitchance", { {"Medium", nullptr},{"High", nullptr},{"Very High", nullptr} }, 2);
+		}
 		auto drawMenu = mainMenuTab->add_tab("drawings", "Drawings Settings");
 		{
 			drawMenu::drawOnlyReady = drawMenu->add_checkbox("drawReady", "Draw Only Ready", true);
@@ -828,9 +901,20 @@ namespace nami {
 			drawMenu::drawRangeW = drawMenu->add_checkbox("drawW", "Draw W range", true);
 			drawMenu::drawRangeE = drawMenu->add_checkbox("drawE", "Draw E range", true);
 			drawMenu::drawRangeR = drawMenu->add_checkbox("drawR", "Draw R range", true);
+
+
+			drawMenu::drawRangeQ->set_texture(myhero->get_spell(spellslot::q)->get_icon_texture());
+			drawMenu::drawRangeW->set_texture(myhero->get_spell(spellslot::w)->get_icon_texture());
+			drawMenu::drawRangeE->set_texture(myhero->get_spell(spellslot::e)->get_icon_texture());
+			drawMenu::drawRangeR->set_texture(myhero->get_spell(spellslot::r)->get_icon_texture());
+
 			drawMenu->add_separator("sep1", "Debug Settings");
-			drawMenu::drawESpells = drawMenu->add_checkbox("drawESpells", "Draw Spells for E", true);
 			drawMenu::drawWTargets = drawMenu->add_checkbox("drawWTargets", "Draw W Hitcount", true);
+			drawMenu::drawESpells = drawMenu->add_checkbox("drawESpells", "Draw Spells for E", true);
+			drawMenu::drawWTargets->set_texture(myhero->get_spell(spellslot::w)->get_icon_texture());
+			drawMenu::drawESpells->set_texture(myhero->get_spell(spellslot::e)->get_icon_texture());
+
+			drawMenu->add_separator("sep2", "");
 
 			auto colorMenu = drawMenu->add_tab("color", "Color Settings");
 
@@ -845,6 +929,16 @@ namespace nami {
 			float rcolor[] = { 1.f, 1.f, 0.f, 1.f };
 			colorMenu::rColor = colorMenu->add_colorpick("colorR", "R Range Color", rcolor);
 		}
+		auto interruptMenu = mainMenuTab->add_tab("interrupt", "Interrupt Settings");
+		{
+			interruptMenu::useQ = interruptMenu->add_checkbox("useQ", "Use Q for Danger >= 1", true);
+			interruptMenu::useQ->set_texture(myhero->get_spell(spellslot::q)->get_icon_texture());
+			interruptMenu::useR = interruptMenu->add_checkbox("useR", "Use R for Danger >= 3", true);
+			interruptMenu::useR->set_texture(myhero->get_spell(spellslot::r)->get_icon_texture());
+			interruptMenu::spelldb = interruptMenu->add_tab("interruptdb", "Spell Database");
+			Database::InitializeCancelMenu(interruptMenu::spelldb);
+		}
+
 		event_handler<events::on_draw>::add_callback(on_draw);
 		event_handler<events::on_env_draw>::add_callback(on_env_draw);
 		event_handler<events::on_update>::add_callback(on_update);

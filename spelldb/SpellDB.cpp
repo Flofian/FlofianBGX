@@ -247,7 +247,7 @@ namespace Database
                     break;
 
                 case champion_id::Velkoz:
-                    InitiateSlot(tab, e, spellslot::r, "Vel'Koz", "Life Form Disintegration Ray", 4);
+                    InitiateSlot(tab, e, spellslot::r, "Vel'Koz", "Life Form Disintegration Ray", 3);
                     break;
 
                 case champion_id::Vi:
