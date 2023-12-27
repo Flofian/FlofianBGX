@@ -412,6 +412,88 @@ namespace nami {
 		}
 		return false;
 	}
+
+	int countWBounces(game_object_script firstTarget) {
+		// Nami w targeting info:
+		// when jumping from ally to enemy -> always takes nearest enemy
+		// when from enemy to ally -> random? atleast no pattern
+		// Also first missile has speed of 2500, the bounces only 1500 (according to game data)
+		float bounceRange = 800;
+		float wBaseHeal = 35 + 20 * w->level() + 0.25 * myhero->get_total_ability_power();
+		// I dont care about antiheal, the bounce modifier, heal/shield power, etc
+		// Because when doing it my way worst thing that can happen is that i waste some heal? but idc
+
+		if (firstTarget->is_ally()) {
+			// Need to split it so i can loop allies->enemies or enemies->allies
+			// Okay not sure whats the best way to handle prediction here? If theres any good way?
+			// maybe try a linear spell with radius 0 and just look at unit position?
+			// Simple way is to estimate traveltime by distance at bounce start, is wrong, but should be close?
+			float travelTime = firstTarget->get_distance(myhero) / 2500;
+			auto predictedAllyPos = prediction->get_prediction(firstTarget, travelTime).get_unit_position();
+			auto enemies = entitylist->get_enemy_heroes();
+			int hitCount = (firstTarget->get_max_health() - firstTarget->get_health() > wBaseHeal);
+			std::map<uint32_t, vector> firstBouncePredList;
+			for (const auto& enemy : enemies) {
+				firstBouncePredList[enemy->get_network_id()] = prediction->get_prediction(enemy, travelTime).get_unit_position();
+			}
+			enemies.erase(std::remove_if(enemies.begin(), enemies.end(), [&](game_object_script x)
+				{
+					return !x->is_targetable() || !x->is_visible() || firstBouncePredList[x->get_network_id()].distance(firstTarget)> bounceRange;
+				}), enemies.end());
+			if (enemies.size() == 0) return hitCount;
+			auto& nearestEnemy = *std::min_element(enemies.begin(), enemies.end(), [&](game_object_script a, game_object_script b) {
+				return predictedAllyPos.distance(firstBouncePredList[a->get_network_id()]) < predictedAllyPos.distance(firstBouncePredList[b->get_network_id()]);
+				});
+			hitCount += 1;
+			// I estimate the time it takes my w to reach the first target, then predict where it and the enemies are
+			// then i take the nearest one
+			// So now i have the target i w to and the target it will bounce to next
+			// next bounce will be random, so i just say what is the max possible
+			travelTime += firstBouncePredList[nearestEnemy->get_network_id()].distance(predictedAllyPos) / 1500;
+			auto nearestEnemyPos = prediction->get_prediction(nearestEnemy, travelTime).get_unit_position();
+			auto allies = entitylist->get_ally_heroes();
+			std::map<uint32_t, vector> secondBouncePredList;
+			for (const auto& ally : allies) {
+				secondBouncePredList[ally->get_network_id()] = prediction->get_prediction(ally, travelTime).get_unit_position();
+			}
+			allies.erase(std::remove_if(allies.begin(), allies.end(), [&](game_object_script x)
+				{
+					return !x->is_targetable() || secondBouncePredList[x->get_network_id()].distance(nearestEnemyPos) > bounceRange || 
+						x->get_handle() == firstTarget->get_handle() || firstTarget->get_max_health() - firstTarget->get_health() < wBaseHeal;
+				}), allies.end());
+			return hitCount + (allies.size() > 0);
+		}
+		if (firstTarget->is_enemy()) {
+			float travelTime = firstTarget->get_distance(myhero) / 2500;
+			auto firstEnemyPos = prediction->get_prediction(firstTarget, travelTime).get_unit_position();
+			std::vector<int> bounceCountList = {};
+			for (const auto& ally : entitylist->get_ally_heroes()) {
+				auto allyPredPos = prediction->get_prediction(ally, travelTime).get_unit_position();
+				if (allyPredPos.distance(firstEnemyPos) > bounceRange) continue;
+				auto newTravelTime = travelTime + allyPredPos.distance(firstEnemyPos) / 1500;
+
+				auto enemies = entitylist->get_enemy_heroes();
+				std::map<uint32_t, vector> secondBouncePredList;
+				for (const auto& enemy : enemies) {
+					secondBouncePredList[enemy->get_network_id()] = prediction->get_prediction(enemy, newTravelTime).get_unit_position();
+				}
+				enemies.erase(std::remove_if(enemies.begin(), enemies.end(), [&](game_object_script x)
+					{
+						return !x->is_targetable() || !x->is_visible() || secondBouncePredList[x->get_network_id()].distance(allyPredPos) > bounceRange ||x->get_handle() == firstTarget->get_handle();
+					}), enemies.end());
+				int currentcount = 1 + (ally->get_max_health() - ally->get_health() > wBaseHeal) + (enemies.size() > 0);
+				// only count the ally if i actually heal, but allow bouncing even if i dont
+				bounceCountList.push_back(currentcount);
+			}
+			int min = bounceCountList.size() == 0 ? 1 : *std::min_element(bounceCountList.begin(), bounceCountList.end());
+			int max = bounceCountList.size() == 0 ? 1 : *std::max_element(bounceCountList.begin(), bounceCountList.end());
+			// not sure if this is needed, but crashed before? so i do like this instead of std::minmax_element
+			return 10* min + max;
+
+		}
+		return 0;
+	}
+
 	void on_update() {
 		update_spells();
 		//console->print("Active Spells: %i", circularSpells.size());
@@ -428,17 +510,18 @@ namespace nami {
 				auto activeSpell = ally->get_active_spell();
 				if (!activeSpell) continue;
 				auto target = entitylist->get_object(activeSpell->get_last_target_id());
-				bool isTargeted = activeSpell->get_spell_data()->get_targeting_type() == spell_targeting::target && target && target->is_valid() && target->is_enemy();
+				bool isTargeted = activeSpell->get_spell_data()->get_targeting_type() == spell_targeting::target;
+				bool isTargetingEnemy = target && target->is_valid() && target->is_enemy() && target->is_ai_hero();
 				bool isAuto = activeSpell->is_auto_attack() && !ally->is_winding_up();
 				std::string spellName = spellSlotName(activeSpell);
 				if (spellName == "") continue; // Unsupported Spell, items, idk
 				bool isSupported = supportedSpells.find(ally->get_model_cstr() + spellName) != supportedSpells.end();
 				bool isEnabled = isSupported ? tab->get_entry(spellName)->get_int() == 2 : tab->get_entry(spellName)->get_bool();
 				// this can be compressed, but i keep it like this for clarity
-				bool useE = (overwrite == 0 && isEnabled) ||
-							(overwrite == 1 && isTargeted && isEnabled) ||
+				bool useE = (overwrite == 0 && isEnabled && (!isTargeted || isTargetingEnemy)) ||
+							(overwrite == 1 && isTargeted && isTargetingEnemy && isEnabled) ||
 							(overwrite == 2 && isAuto && isEnabled) ||
-							(overwrite == 3 && isTargeted) ||
+							(overwrite == 3 && isTargeted && isTargetingEnemy) ||
 							(overwrite == 4 && isAuto);
 				if (useE) e->cast(ally);
 				//console->print("%f: %s %s, TargetsEnemy: %i, AA: %i, Enabled: %i, Use E: %i", gametime->get_time(), ally->get_model_cstr(), spellSlotName(activeSpell).c_str(), isTargeted, isAuto, isEnabled, useE);
@@ -475,7 +558,20 @@ namespace nami {
 
 	void on_draw() {
 		update_spells();
-		//console->print("DRAW");
+
+		for (const auto& ally : entitylist->get_ally_heroes()) {
+			if (ally->get_distance(myhero) > 725) continue;
+			int bt = countWBounces(ally);
+			draw_manager->add_text(ally->get_position(), MAKE_COLOR(255 * (bt <3), 255 * (bt > 1), 0, 255), 30, "%i", bt);
+		}
+		for (const auto& enemy : entitylist->get_enemy_heroes()) {
+			if (enemy->get_distance(myhero) > 725) continue;
+			int b = countWBounces(enemy);
+			int minb = int(b / 10);
+			int maxb = b % 10;
+			draw_manager->add_text(enemy->get_position(), MAKE_COLOR(0,0,255, 255), 30, "MIN: %i MAX: %i", minb, maxb);
+		}
+
 		if(drawMenu::drawESpells->get_bool())
 		{
 			//console->print("%i Circ Spells", circularSpells.size());
@@ -543,8 +639,12 @@ namespace nami {
 			if (linSpellDB.find(h) != linSpellDB.end()) {
 				missileList.push_back(obj);
 			}
-			console->print(obj->get_missile_sdata()->get_name_cstr());
-			
+			//console->print(obj->get_missile_sdata()->get_name_cstr());
+			/*if (h == spell_hash("NamiWMissileAlly") || h == spell_hash("NamiWMissileEnemy") || h == spell_hash("NamiWAlly") || h == spell_hash("NamiWEnemy")) {
+				console->print("Start Speed: %f", obj->missile_movement_get_current_speed());
+				console->print("Start Accel: %f", obj->missile_movement_get_acceleration_magnitude());
+				console->print("Target: %s", obj->missile_movement_get_target_unit()->get_model_cstr());
+			}*/
 		}
 	}
 	void on_delete_object(game_object_script obj) {
