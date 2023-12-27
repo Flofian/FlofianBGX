@@ -113,6 +113,7 @@ namespace nami {
 	namespace qMenu {
 		TreeEntry* hc;
 		TreeEntry* mode;
+		TreeEntry* onCC;
 
 	}
 	namespace wMenu {
@@ -532,6 +533,7 @@ namespace nami {
 		// tbh i think i just dont do a combo and a harass method and just do all in here
 
 		if (q->is_ready()) {
+			// Combo/Harass Cast
 			bool modeCast = (qMenu::mode->get_int() == 0 && orbwalker->harass()) || (qMenu::mode->get_int() <= 1 && orbwalker->combo_mode());
 			if (modeCast) {
 				auto target = target_selector->get_target(q, damage_type::magical);
@@ -543,6 +545,17 @@ namespace nami {
 					}
 				}
 			}
+			// Auto Q
+			for (const auto& target : entitylist->get_enemy_heroes()) {
+				if (!target || !target->is_valid_target(q->range()) || target->is_dead() || !target->is_visible() || target->get_is_cc_immune()) continue;
+				// On CC
+				if (qMenu::onCC->get_bool() && target->get_immovibility_time() > q->delay)
+				{
+					q->cast(target);
+					return;
+				}
+			}
+
 
 		}
 
@@ -791,6 +804,8 @@ namespace nami {
 			qMenu->set_assigned_texture(myhero->get_spell(spellslot::q)->get_icon_texture());
 			qMenu::hc = qMenu->add_combobox("Hitchance", "Hitchance", { {"Medium", nullptr},{"High", nullptr},{"Very High", nullptr} }, 2);
 			qMenu::mode = qMenu->add_combobox("mode", "Q Mode", { {"Combo + Harass", nullptr},{"Combo", nullptr}, {"Off", nullptr} }, 0);
+			qMenu->add_separator("sep1", "Auto Q");
+			qMenu::onCC = qMenu->add_checkbox("oncc", "On CC", true);
 		}
 		auto wMenu = mainMenuTab->add_tab("w", "W Settings");
 		{
