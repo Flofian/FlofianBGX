@@ -106,6 +106,7 @@ namespace nami {
 	std::vector<linSpell> linearSpells;
 	std::vector<game_object_script> missileList;
 	
+	std::map<uint32_t, TreeEntry*> wLowHPList;
 
 	namespace generalMenu {
 		TreeEntry* debug = nullptr;
@@ -115,6 +116,10 @@ namespace nami {
 	}
 	namespace wMenu {
 		TreeEntry* minHealRatio = nullptr;
+		TreeEntry* mode = nullptr;
+		TreeEntry* minTargets = nullptr;
+		TreeEntry* autoWTripleHit = nullptr;
+		TreeTab* useOnLowHP = nullptr;
 	}
 	namespace eMenu {
 		TreeEntry* mode = nullptr;
@@ -132,6 +137,7 @@ namespace nami {
 		TreeEntry* drawRangeE = nullptr;
 		TreeEntry* drawRangeR = nullptr;
 		TreeEntry* drawESpells = nullptr;
+		TreeEntry* drawWTargets = nullptr;
 	}
 	namespace colorMenu
 	{
@@ -427,9 +433,6 @@ namespace nami {
 		// when from enemy to ally -> random? atleast no pattern
 		// Also first missile has speed of 2500, the bounces only 1500 (according to game data)
 		float bounceRange = 800;
-		float wBaseHeal = 35 + 20 * w->level() + 0.25 * myhero->get_total_ability_power();
-		// I dont care about antiheal, the bounce modifier, heal/shield power, etc
-		// Because when doing it my way worst thing that can happen is that i waste some heal? but idc
 
 		if (firstTarget->is_ally()) {
 			// Need to split it so i can loop allies->enemies or enemies->allies
@@ -502,10 +505,38 @@ namespace nami {
 		return 0;
 	}
 
-	void on_update() {
-		update_spells();
-		//console->print("Active Spells: %i", circularSpells.size());
 
+	void on_update() {
+		// TODO: either give user control or just use either min or max
+		update_spells();
+		// tbh i think i just dont do a combo and a harass method and just do all in here
+
+		// W Logic
+		if (w->is_ready())
+		{
+			// multi bounce logic
+			bool modeCast = (wMenu::mode->get_int() == 0 && orbwalker->harass()) || (wMenu::mode->get_int() <= 1 && orbwalker->combo_mode());
+			int modeMinTargets = wMenu::minTargets->get_int();
+			for (const auto& ally : entitylist->get_ally_heroes()) {
+				if (ally->get_distance(myhero) > w->range()) continue;
+				int bt = countWBounces(ally);
+				if ((bt == 3 && wMenu::autoWTripleHit->get_bool()) || (modeCast && bt >= modeMinTargets)) w->cast(ally);
+				
+			}
+			for (const auto& enemy : entitylist->get_enemy_heroes()) {
+				if (enemy->get_distance(myhero) > w->range() || !enemy->is_targetable() || !enemy->is_visible()) continue;
+				int b = countWBounces(enemy);
+				int minb = int(b / 10);
+				int maxb = b % 10;
+				if ((maxb == 3 && wMenu::autoWTripleHit->get_bool()) || (modeCast && maxb >= modeMinTargets)) w->cast(enemy);
+			}
+
+			// auto low hp
+			for (const auto& ally : entitylist->get_ally_heroes()) {
+				if (ally->get_distance(myhero) > w->range() || ally->is_dead() || !ally->is_targetable()) continue;
+				if (ally->get_health_percent() < wLowHPList[ally->get_network_id()]->get_int()) w->cast(ally);
+			}
+		}
 		
 		// E Logic
 		int eMode = eMenu::mode->get_int();
@@ -532,6 +563,7 @@ namespace nami {
 							(overwrite == 3 && isTargeted && isTargetingEnemy) ||
 							(overwrite == 4 && isAuto);
 				if (useE) e->cast(ally);
+
 				//console->print("%f: %s %s, TargetsEnemy: %i, AA: %i, Enabled: %i, Use E: %i", gametime->get_time(), ally->get_model_cstr(), spellSlotName(activeSpell).c_str(), isTargeted, isAuto, isEnabled, useE);
 			}
 			if (overwrite != 0) return;
@@ -565,21 +597,23 @@ namespace nami {
 	}	
 
 	void on_draw() {
+
+
 		update_spells();
-
-		for (const auto& ally : entitylist->get_ally_heroes()) {
-			if (ally->get_distance(myhero) > 725) continue;
-			int bt = countWBounces(ally);
-			draw_manager->add_text(ally->get_position(), MAKE_COLOR(255 * (bt <3), 255 * (bt > 1), 0, 255), 30, "%i", bt);
+		if(drawMenu::drawWTargets->get_bool()){
+			for (const auto& ally : entitylist->get_ally_heroes()) {
+				if (ally->get_distance(myhero) > 725) continue;
+				int bt = countWBounces(ally);
+				draw_manager->add_text(ally->get_position(), MAKE_COLOR(255 * (bt < 3), 255 * (bt > 1), 0, 255), 30, "%i", bt);
+			}
+			for (const auto& enemy : entitylist->get_enemy_heroes()) {
+				if (enemy->get_distance(myhero) > 725 || !enemy->is_targetable() || !enemy->is_visible()) continue;
+				int b = countWBounces(enemy);
+				int minb = int(b / 10);
+				int maxb = b % 10;
+				draw_manager->add_text(enemy->get_position(), MAKE_COLOR(0, 0, 255, 255), 30, "MIN: %i MAX: %i", minb, maxb);
+			}
 		}
-		for (const auto& enemy : entitylist->get_enemy_heroes()) {
-			if (enemy->get_distance(myhero) > 725 || !enemy->is_targetable() || !enemy->is_visible()) continue;
-			int b = countWBounces(enemy);
-			int minb = int(b / 10);
-			int maxb = b % 10;
-			draw_manager->add_text(enemy->get_position(), MAKE_COLOR(0,0,255, 255), 30, "MIN: %i MAX: %i", minb, maxb);
-		}
-
 		if(drawMenu::drawESpells->get_bool())
 		{
 			//console->print("%i Circ Spells", circularSpells.size());
@@ -686,6 +720,16 @@ namespace nami {
 			wMenu::minHealRatio->set_tooltip("Only Counts bounces to allies if you heal them\n"
 											"If at 100, only count if missingHealth > wHeal\n"
 											"If at 50, only count if you waste half your heal at max");
+			wMenu::mode = wMenu->add_combobox("mode", "W Mode", { {"Combo + Harass", nullptr},{"Combo", nullptr}, {"Off", nullptr} }, 0);
+			wMenu::minTargets = wMenu->add_slider("minTargets", "Min Targets", 2, 1, 3);
+			wMenu::autoWTripleHit = wMenu->add_checkbox("autoTripleHit", "Auto W when 3 bounces", true);
+			wMenu::useOnLowHP = wMenu->add_tab("useOnLowHP", "Auto W Allies under x% HP");
+			wMenu::useOnLowHP->add_separator("sep1", "0 to disable");
+			for (const auto& ally : entitylist->get_ally_heroes()) {
+				uint32_t id = ally->get_network_id();
+				wLowHPList[id] = wMenu::useOnLowHP->add_slider(std::to_string(id), ally->get_model(), 50 - 25*(myhero->get_handle() == ally->get_handle()), 0, 100, false);
+			}
+
 		}
 		auto eMenu = mainMenuTab->add_tab("e", "E Settings");
 		{
@@ -783,8 +827,10 @@ namespace nami {
 			drawMenu::drawRangeQ = drawMenu->add_checkbox("drawQ", "Draw Q range", true);
 			drawMenu::drawRangeW = drawMenu->add_checkbox("drawW", "Draw W range", true);
 			drawMenu::drawRangeE = drawMenu->add_checkbox("drawE", "Draw E range", true);
-			drawMenu::drawESpells = drawMenu->add_checkbox("drawESpells", "Draw Spells for E", true);
 			drawMenu::drawRangeR = drawMenu->add_checkbox("drawR", "Draw R range", true);
+			drawMenu->add_separator("sep1", "Debug Settings");
+			drawMenu::drawESpells = drawMenu->add_checkbox("drawESpells", "Draw Spells for E", true);
+			drawMenu::drawWTargets = drawMenu->add_checkbox("drawWTargets", "Draw W Hitcount", true);
 
 			auto colorMenu = drawMenu->add_tab("color", "Color Settings");
 
