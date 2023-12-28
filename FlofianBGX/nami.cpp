@@ -232,6 +232,13 @@ namespace nami {
 		TreeEntry* drawRangeR = nullptr;
 		TreeEntry* drawESpells = nullptr;
 		TreeEntry* drawWTargets = nullptr;
+		TreeEntry* lineThickness = nullptr;
+		TreeEntry* glowInsideSize = nullptr;
+		TreeEntry* glowInsidePow = nullptr;
+		TreeEntry* glowOutsideSize = nullptr;
+		TreeEntry* glowOutsidePow = nullptr;
+		TreeEntry* useGrad = nullptr;
+		TreeEntry* gradColor = nullptr;
 	}
 	namespace colorMenu
 	{
@@ -821,8 +828,8 @@ namespace nami {
 			bool modeCast = (qMenu::mode->get_int() == 0 && orbwalker->harass()) || (qMenu::mode->get_int() <= 1 && orbwalker->combo_mode());
 			if (modeCast) {
 				auto target = target_selector->get_target(q, damage_type::magical);
-				if (target) {
-					auto pred = qPredictionList[target->get_handle()];
+				if (target && qPredictionList.find(target->get_handle())!=qPredictionList.end()) {
+					auto& pred = qPredictionList[target->get_handle()];
 					if (pred.hitchance >= get_hitchance(qMenu::hc->get_int())) {
 						q->cast(pred.get_cast_position());
 						return;
@@ -831,10 +838,10 @@ namespace nami {
 			}
 			// Auto Q
 			for (const auto& target : entitylist->get_enemy_heroes()) {
-				if (!target || !target->is_valid() || target->get_distance(myhero)>q->range() || target->is_dead()) continue;
-				auto pred = qPredictionList[target->get_handle()];
+				if (!target || !target->is_valid() || target->get_distance(myhero)>q->range() || target->is_dead() || qPredictionList.find(target->get_handle()) == qPredictionList.end()) continue;
+				auto& pred = qPredictionList[target->get_handle()];
 				// Stasis
-				if (qMenu::onStasis->get_bool())
+				if (qMenu::onStasis->get_bool() && stasisInfo.find(target->get_handle()) != stasisInfo.end())
 				{
 					const auto stasisDuration = stasisInfo[target->get_handle()].stasisTime;
 					if (((customIsValid(target) || stasisDuration > 0) && !target->is_zombie()))					
@@ -855,8 +862,7 @@ namespace nami {
 				// Special Spell
 				if (qMenu::onSpecialSpells->get_bool()) {
 					auto activeSpell = target->get_active_spell();
-					auto data = activeSpell->get_spell_data();
-					if (activeSpell && !data->is_insta() && !data->mCanMoveWhileChanneling() && !isCastMoving(target) && target->get_champion() != champion_id::Yone)	// hardcoded since fuck this guy
+					if (activeSpell && !activeSpell->get_spell_data()->is_insta() && !activeSpell->get_spell_data()->mCanMoveWhileChanneling() && !isCastMoving(target) && target->get_champion() != champion_id::Yone)	// hardcoded since fuck this guy
 					{
 						auto castStartTime = activeSpell->cast_start_time();
 						auto castTime = activeSpell->get_spell_data()->mCastTime();
@@ -1106,15 +1112,38 @@ namespace nami {
 		{
 			return;
 		}
-
-		if ((q->is_ready() || !drawMenu::drawOnlyReady->get_bool()) && drawMenu::drawRangeQ->get_bool())
-			draw_manager->add_circle(myhero->get_position(), q->range(), colorMenu::qColor->get_color());
-		if ((w->is_ready() || !drawMenu::drawOnlyReady->get_bool()) && drawMenu::drawRangeW->get_bool())
-			draw_manager->add_circle(myhero->get_position(), w->range(), colorMenu::wColor->get_color());
-		if ((e->is_ready() || !drawMenu::drawOnlyReady->get_bool()) && drawMenu::drawRangeE->get_bool())
-			draw_manager->add_circle(myhero->get_position(), e->range(), colorMenu::eColor->get_color());
-		if ((r->is_ready() || !drawMenu::drawOnlyReady->get_bool()) && drawMenu::drawRangeR->get_bool())
-			draw_manager->add_circle(myhero->get_position(), r->range(), colorMenu::rColor->get_color());
+		float lt = drawMenu::lineThickness->get_int() / 10.f;
+		glow_data glow = glow_data(drawMenu::glowInsideSize->get_int() / 100.f, drawMenu::glowInsidePow->get_int() / 100.f, drawMenu::glowOutsideSize->get_int() / 100.f, drawMenu::glowOutsidePow->get_int() / 100.f);
+		if(drawMenu::useGrad->get_bool())
+		{
+			if ((q->is_ready() || !drawMenu::drawOnlyReady->get_bool()) && drawMenu::drawRangeQ->get_bool())
+				//draw_manager->add_circle(myhero->get_position(), q->range(), colorMenu::qColor->get_color());
+				draw_manager->add_circle_with_glow_gradient(myhero->get_position(), colorMenu::qColor->get_color(), drawMenu::gradColor->get_color(), q->range(), lt, glow);
+			if ((w->is_ready() || !drawMenu::drawOnlyReady->get_bool()) && drawMenu::drawRangeW->get_bool())
+				//draw_manager->add_circle(myhero->get_position(), w->range(), colorMenu::wColor->get_color());
+				draw_manager->add_circle_with_glow_gradient(myhero->get_position(), colorMenu::wColor->get_color(), drawMenu::gradColor->get_color(), w->range(), lt, glow);
+			if ((e->is_ready() || !drawMenu::drawOnlyReady->get_bool()) && drawMenu::drawRangeE->get_bool())
+				//draw_manager->add_circle(myhero->get_position(), e->range(), colorMenu::eColor->get_color());
+				draw_manager->add_circle_with_glow_gradient(myhero->get_position(), colorMenu::eColor->get_color(), drawMenu::gradColor->get_color(), e->range(), lt, glow);
+			if ((r->is_ready() || !drawMenu::drawOnlyReady->get_bool()) && drawMenu::drawRangeR->get_bool())
+				//draw_manager->add_circle(myhero->get_position(), r->range(), colorMenu::rColor->get_color());
+				draw_manager->add_circle_with_glow_gradient(myhero->get_position(), colorMenu::rColor->get_color(), drawMenu::gradColor->get_color(), r->range(), lt, glow);
+		}
+		else {
+			if ((q->is_ready() || !drawMenu::drawOnlyReady->get_bool()) && drawMenu::drawRangeQ->get_bool())
+				//draw_manager->add_circle(myhero->get_position(), q->range(), colorMenu::qColor->get_color());
+				draw_manager->add_circle_with_glow(myhero->get_position(), colorMenu::qColor->get_color(),  q->range(), lt, glow);
+			if ((w->is_ready() || !drawMenu::drawOnlyReady->get_bool()) && drawMenu::drawRangeW->get_bool())
+				//draw_manager->add_circle(myhero->get_position(), w->range(), colorMenu::wColor->get_color());
+				draw_manager->add_circle_with_glow(myhero->get_position(), colorMenu::wColor->get_color(),  w->range(), lt, glow);
+			if ((e->is_ready() || !drawMenu::drawOnlyReady->get_bool()) && drawMenu::drawRangeE->get_bool())
+				//draw_manager->add_circle(myhero->get_position(), e->range(), colorMenu::eColor->get_color());
+				draw_manager->add_circle_with_glow(myhero->get_position(), colorMenu::eColor->get_color(),  e->range(), lt, glow);
+			if ((r->is_ready() || !drawMenu::drawOnlyReady->get_bool()) && drawMenu::drawRangeR->get_bool())
+				//draw_manager->add_circle(myhero->get_position(), r->range(), colorMenu::rColor->get_color());
+				draw_manager->add_circle_with_glow(myhero->get_position(), colorMenu::rColor->get_color(),  r->range(), lt, glow);
+		}
+		
 	}
 
 	void on_process_spell_cast(game_object_script sender, spell_instance_script spell) {
@@ -1495,7 +1524,20 @@ namespace nami {
 			drawMenu::drawESpells->set_texture(myhero->get_spell(spellslot::e)->get_icon_texture());
 
 			drawMenu->add_separator("sep2", "");
+			drawMenu::lineThickness = drawMenu->add_slider("lineThickness", "Line Thickness", 10, 10, 50);
+			drawMenu::glowInsideSize = drawMenu->add_slider("glowInsideSize", "Glow Inside Size", 5, 0, 100);
+			drawMenu::glowInsidePow = drawMenu->add_slider("glowInsidePow", "Glow Inside Power", 90, 0, 100);
+			drawMenu::glowOutsideSize = drawMenu->add_slider("glowOutsideSize", "Glow Outside Size", 10, 0, 100);
+			drawMenu::glowOutsidePow = drawMenu->add_slider("glowOutsidePow", "Glow Outside Power", 90, 0, 100);
+			drawMenu::useGrad = drawMenu->add_checkbox("useGrad", "Use Gradient", false);
+			float gradcolor[] = { 0.f, 0.f, 1.f, 1.f };
+			drawMenu::gradColor = drawMenu->add_colorpick("gradColor", "Gradient Color", gradcolor);
+			drawMenu::useGrad->add_property_change_callback([](TreeEntry* entry) {
+				drawMenu::gradColor->is_hidden() = !entry->get_bool();
+				});
+			drawMenu::gradColor->is_hidden() = !drawMenu::useGrad->get_bool();
 
+			drawMenu->add_separator("sep3", "");
 			auto colorMenu = drawMenu->add_tab("color", "Color Settings");
 
 			float qcolor[] = { 0.f, 0.f, 1.f, 1.f };
