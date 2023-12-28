@@ -20,11 +20,11 @@ Current Champions:
 
 - Malphite
 
-Work in Progress:
-
 - Nami
 
 Possible Future Champs: 
+
+- Bard
 
 - Ryze?
 

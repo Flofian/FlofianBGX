@@ -119,7 +119,7 @@ namespace Database
                     break;
 
                 case champion_id::Briar:
-                    InitiateSlot(tab, e, spellslot::e, "Briar", "Comeuppance", 0);
+                    InitiateSlot(tab, e, spellslot::e, "Briar", "Chilling Scream", 0);
                     break;
 
                 case champion_id::Caitlyn:
@@ -132,7 +132,7 @@ namespace Database
                     break;
 
                 case champion_id::Galio:
-                    InitiateSlot(tab, e, spellslot::w, "Galio", "Shield of Durand", 1);
+                    InitiateSlot(tab, e, spellslot::w, "Galio", "Shield of Durand", 0);
                     InitiateSlot(tab, e, spellslot::r, "Galio", "Hero's Entrance", 3);
                     break;
 
@@ -184,7 +184,7 @@ namespace Database
                     break;
 
                 case champion_id::Naafiri:
-                    InitiateSlot(tab, e, spellslot::w, "Naafiri", "Comeuppance", 1);
+                    InitiateSlot(tab, e, spellslot::w, "Naafiri", "Hounds' Pursuit", 0);
                     break;
 
                 case champion_id::Nunu:
@@ -193,7 +193,7 @@ namespace Database
                     break;
 
                 case champion_id::Pantheon:
-                    InitiateSlot(tab, e, spellslot::q, "Pantheon", "Comet Spear", 1);
+                    InitiateSlot(tab, e, spellslot::q, "Pantheon", "Comet Spear", 0);
 
                     InitiateSlot(tab, e, spellslot::r, "Pantheon", "Grand Starfall", 3);
                     break;
@@ -203,7 +203,7 @@ namespace Database
                     break;
 
                 case champion_id::Pyke:
-                    InitiateSlot(tab, e, spellslot::q, "Pyke", "Bone Skewer", 1);
+                    InitiateSlot(tab, e, spellslot::q, "Pyke", "Bone Skewer", 0);
                     break;
 
                 case champion_id::Quinn:
@@ -235,7 +235,7 @@ namespace Database
                     break;
 
                 case champion_id::Taliyah:
-                    InitiateSlot(tab, e, spellslot::r, "Taliyah", "Weaver's Wall", 1);
+                    InitiateSlot(tab, e, spellslot::r, "Taliyah", "Weaver's Wall", 0);
                     break;
 
                 case champion_id::TwistedFate:
@@ -247,19 +247,19 @@ namespace Database
                     break;
 
                 case champion_id::Velkoz:
-                    InitiateSlot(tab, e, spellslot::r, "Vel'Koz", "Life Form Disintegration Ray", 4);
+                    InitiateSlot(tab, e, spellslot::r, "Vel'Koz", "Life Form Disintegration Ray", 3);
                     break;
 
                 case champion_id::Vi:
-                    InitiateSlot(tab, e, spellslot::q, "Vi", "Vault Breaker", 1);
+                    InitiateSlot(tab, e, spellslot::q, "Vi", "Vault Breaker", 0);
                     break;
 
                 case champion_id::Viego:
-                    InitiateSlot(tab, e, spellslot::w, "Viego", "Spectral Maw", 1);
+                    InitiateSlot(tab, e, spellslot::w, "Viego", "Spectral Maw", 0);
                     break;
 
                 case champion_id::Vladimir:
-                    InitiateSlot(tab, e, spellslot::e, "Vladimir", "Tides of Blood", 1);
+                    InitiateSlot(tab, e, spellslot::e, "Vladimir", "Tides of Blood", 0);
                     break;
 
                 case champion_id::Warwick:
@@ -268,7 +268,7 @@ namespace Database
                     break;
 
                 case champion_id::Xerath:
-                    InitiateSlot(tab, e, spellslot::q, "Xerath", "Arcanopulse", 1);
+                    InitiateSlot(tab, e, spellslot::q, "Xerath", "Arcanopulse", 0);
                     InitiateSlot(tab, e, spellslot::r, "Xerath", "Rite of the Arcane", 3);
                     break;
 
@@ -293,7 +293,7 @@ namespace Database
     {
         auto active = target->get_active_spell();
         if (!active)
-            return false;
+            return 0;
         auto slot = active->get_spellslot();
 
         std::string key;
