@@ -888,36 +888,50 @@ namespace nami {
 							(overwrite == 2 && isAuto && isEnabled) ||
 							(overwrite == 3 && isTargeted && isTargetingEnemy) ||
 							(overwrite == 4 && isAuto);
-				if (useE) e->cast(ally);
+				
+				if (useE){ 
+					e->cast(ally);
+					return;
+				}
 
 				//console->print("%f: %s %s, TargetsEnemy: %i, AA: %i, Enabled: %i, Use E: %i", gametime->get_time(), ally->get_model_cstr(), spellSlotName(activeSpell).c_str(), isTargeted, isAuto, isEnabled, useE);
 			}
-			if (overwrite != 0) return;
-			for (circSpell c : circularSpells) {
-				bool guaranteeHit = semiGuaranteeHitCircular(c);
-				if (!guaranteeHit) continue;
-				const auto& s = entitylist->get_object_by_network_id(c.sender);
-				auto tab = eDB[s->get_model_cstr()];
-				
-				if (!tab || !tab->get_entry("enable")->get_bool() || s->get_distance(myhero) > e->range()) continue;
-				std::string spellName = spellSlotName(c.slot);
-				if (spellName == "") return;
-				bool isEnabled = tab->get_entry(spellName)->get_int() == 1;
-				if (isEnabled) e->cast(s);
-			}
-			for (game_object_script missile : missileList) {
-				auto hash = missile->get_missile_sdata()->get_name_hash();
-				auto lit = linSpellDB[hash];
-				bool guaranteeHit = semiGuaranteeHitLinear(missile);
-				if (!guaranteeHit) continue;
-				const auto& sender = entitylist->get_object(missile->missile_get_sender_id());
-				if (!sender) continue;
-				auto tab = eDB[sender->get_model_cstr()];
-				if (!tab || !tab->get_entry("enable")->get_bool() || sender->get_distance(myhero) > e->range()) continue;
-				std::string spellName = spellSlotName(lit.slot);
-				if (spellName == "") return;
-				bool isEnabled = tab->get_entry(spellName)->get_int() == 1;
-				if (isEnabled) e->cast(sender);
+			if (overwrite == 0)
+			{
+				for (circSpell c : circularSpells) {
+					bool guaranteeHit = semiGuaranteeHitCircular(c);
+					if (!guaranteeHit) continue;
+					const auto& s = entitylist->get_object_by_network_id(c.sender);
+					auto tab = eDB[s->get_model_cstr()];
+
+					if (!tab || !tab->get_entry("enable")->get_bool() || s->get_distance(myhero) > e->range()) continue;
+					std::string spellName = spellSlotName(c.slot);
+					if (spellName == "") continue;
+					bool isEnabled = tab->get_entry(spellName)->get_int() == 1;
+					if (isEnabled) 
+					{
+						e->cast(s);
+						return;
+					}
+				}
+				for (game_object_script missile : missileList) {
+					auto hash = missile->get_missile_sdata()->get_name_hash();
+					auto lit = linSpellDB[hash];
+					bool guaranteeHit = semiGuaranteeHitLinear(missile);
+					if (!guaranteeHit) continue;
+					const auto& sender = entitylist->get_object(missile->missile_get_sender_id());
+					if (!sender) continue;
+					auto tab = eDB[sender->get_model_cstr()];
+					if (!tab || !tab->get_entry("enable")->get_bool() || sender->get_distance(myhero) > e->range()) continue;
+					std::string spellName = spellSlotName(lit.slot);
+					if (spellName == "") continue;
+					bool isEnabled = tab->get_entry(spellName)->get_int() == 1;
+					if (isEnabled)
+					{
+						e->cast(sender);
+						return;
+					}
+				}
 			}
 		}
 
@@ -1166,13 +1180,11 @@ namespace nami {
 			return;
 		}
 	}
-
 	void on_buff_gain(game_object_script sender, buff_instance_script buff)
 	{
 		// Grouping on buff gain && on buff lose together
 		on_buff(sender, buff, true);
 	}
-
 	void on_buff_lose(game_object_script sender, buff_instance_script buff)
 	{
 		// Grouping on buff gain && on buff lose together
