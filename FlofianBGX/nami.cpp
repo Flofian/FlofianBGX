@@ -2,11 +2,12 @@
 #include "nami.h"
 #include "../spelldb/SpellDB.h"
 #include <inttypes.h>
+#include "permashow.hpp"
 
 // Warning: This code is ugly
 
 namespace nami {
-	std::string VERSION = "Version: BETA 0.1.0";
+	std::string VERSION = "Version: 1.0.0";
 	script_spell* q = nullptr;
 	script_spell* w = nullptr;
 	script_spell* e = nullptr;
@@ -108,6 +109,7 @@ namespace nami {
 	std::vector<linSpell> linearSpells;
 	std::vector<game_object_script> missileList;
 	std::map<uint32_t, TreeEntry*> wLowHPList;
+	std::map<uint32_t, TreeEntry*> qDashWhitelist;
 	std::unordered_map<uint32_t, prediction_output> qPredictionList;
 	std::unordered_map<uint32_t, prediction_output> rPredictionList;
 
@@ -195,6 +197,9 @@ namespace nami {
 		TreeEntry* onSpecialSpells;
 		TreeEntry* onStasis;
 		TreeEntry* onDashes;
+		TreeTab* dashWhitelist;
+		TreeEntry* range;
+		TreeEntry* toggleRadius;
 	}
 	namespace wMenu {
 		TreeEntry* minHealRatio = nullptr;
@@ -202,6 +207,7 @@ namespace nami {
 		TreeEntry* minTargets = nullptr;
 		TreeEntry* autoWTripleHit = nullptr;
 		TreeTab* useOnLowHP = nullptr;
+		TreeEntry* wHealMana = nullptr;
 	}
 	namespace eMenu {
 		TreeEntry* mode = nullptr;
@@ -216,6 +222,7 @@ namespace nami {
 		TreeEntry* semiKey = nullptr;
 		TreeEntry* semiTargets = nullptr;
 		TreeEntry* semiSelected = nullptr;
+		TreeEntry* flee = nullptr;
 	}
 	namespace drawMenu {
 		TreeEntry* drawOnlyReady = nullptr;
@@ -520,6 +527,13 @@ namespace nami {
 		float wBaseHeal = 35 + 20 * w->level() + 0.25 * myhero->get_total_ability_power();
 		return ally->get_max_health() - ally->get_health() >= wBaseHeal * wMenu::minHealRatio->get_int() / 100.f;
 	}
+	bool wKillEnemy(game_object_script enemy, int hitCount) {
+		float wBaseDamage = 20 + 40 * w->level() + 0.55 * myhero->get_total_ability_power();
+		float dmgMod = -0.15 + 0.00075 * myhero->get_total_ability_power();
+		float wPreDamage = hitCount == 0 ? wBaseDamage : wBaseDamage * powf(dmgMod, hitCount);		// i dont trust powf
+		float totalDmg = damagelib->calculate_damage_on_unit(myhero, enemy, damage_type::magical, wPreDamage);
+		return totalDmg > enemy->get_real_health();
+	}
 	int countWBounces(game_object_script firstTarget) {
 		// Nami w targeting info:
 		// when jumping from ally to enemy -> always takes nearest enemy
@@ -548,7 +562,7 @@ namespace nami {
 			auto& nearestEnemy = *std::min_element(enemies.begin(), enemies.end(), [&](game_object_script a, game_object_script b) {
 				return predictedAllyPos.distance(firstBouncePredList[a->get_network_id()]) < predictedAllyPos.distance(firstBouncePredList[b->get_network_id()]);
 				});
-			hitCount += 1;
+			hitCount += 1 + wKillEnemy(nearestEnemy, 1);
 			// I estimate the time it takes my w to reach the first target, then predict where it and the enemies are
 			// then i take the nearest one
 			// So now i have the target i w to and the target it will bounce to next
@@ -585,7 +599,7 @@ namespace nami {
 					{
 						return !x->is_targetable() || !x->is_visible() || secondBouncePredList[x->get_network_id()].distance(allyPredPos) > bounceRange ||x->get_handle() == firstTarget->get_handle();
 					}), enemies.end());
-				int currentcount = 1 + wAllyHeal(ally) + (enemies.size() > 0);
+				int currentcount = 1 + wKillEnemy(firstTarget, 0) + wAllyHeal(ally) + (enemies.size() > 0);
 				// only count the ally if i actually heal, but allow bouncing even if i dont
 				bounceCountList.push_back(currentcount);
 			}
@@ -841,7 +855,8 @@ namespace nami {
 				// Special Spell
 				if (qMenu::onSpecialSpells->get_bool()) {
 					auto activeSpell = target->get_active_spell();
-					if (activeSpell && !activeSpell->get_spell_data()->is_insta() && !activeSpell->get_spell_data()->mCanMoveWhileChanneling() && !isCastMoving(target))
+					auto data = activeSpell->get_spell_data();
+					if (activeSpell && !data->is_insta() && !data->mCanMoveWhileChanneling() && !isCastMoving(target) && data->get_name_hash() != spell_hash("YoneR"))	// hardcoded since fuck this guy
 					{
 						auto castStartTime = activeSpell->cast_start_time();
 						auto castTime = activeSpell->get_spell_data()->mCastTime();
@@ -854,9 +869,9 @@ namespace nami {
 					}
 				}
 				// Dashes
-				if (qMenu::onDashes->get_int()!=0) {
+				if (qMenu::onDashes->get_int()!=0 && qDashWhitelist.find(target->get_network_id())!=qDashWhitelist.end() && qDashWhitelist.find(target->get_network_id())->second->get_bool()) {
 					//if (generalMenu::debug->get_bool()) console->print("%s is dashing: %i", target->get_model_cstr(), target->is_dashing());
-					if ((qMenu::onDashes->get_int() == 2 && target->is_dashing()) || (pred.hitchance == hit_chance::dashing && qMenu::onDashes->get_int() == 1)) {	// TODO: check if && needed or only check hitchance
+					if ((qMenu::onDashes->get_int() == 2 && target->is_dashing()) || (pred.hitchance == hit_chance::dashing && qMenu::onDashes->get_int() == 1)) {
 						q->cast(pred.get_cast_position());
 						if (generalMenu::debug->get_bool()) console->print("Cast Q on Dash %s", target->get_model_cstr());
 						return;
@@ -889,14 +904,17 @@ namespace nami {
 			}
 
 			// auto low hp
-			for (const auto& ally : entitylist->get_ally_heroes()) {
-				if (ally->get_distance(myhero) > w->range() || ally->is_dead() || !ally->is_targetable()) continue;
-				if (ally->get_health_percent() < wLowHPList[ally->get_network_id()]->get_int()) w->cast(ally);
+			if(myhero->get_mana_percent()>wMenu::wHealMana->get_int() && !myhero->is_recalling())
+			{
+				for (const auto& ally : entitylist->get_ally_heroes()) {
+					if (ally->get_distance(myhero) > w->range() || ally->is_dead() || !ally->is_targetable()) continue;
+					if (ally->get_health_percent() < wLowHPList[ally->get_network_id()]->get_int()) w->cast(ally);
+				}
 			}
 		}
 		
 		int eMode = eMenu::mode->get_int();
-		if (e->is_ready() && (eMode == 0 || (eMode == 1 && orbwalker->harass()) || (eMode <= 2 && orbwalker->combo_mode()))) {
+		if (e->is_ready() && !myhero->is_recalling() && (eMode == 0 || (eMode == 1 && orbwalker->harass()) || (eMode <= 2 && orbwalker->combo_mode()))) {
 			int overwrite = eMenu::overwrite->get_int();
 			for (const auto& ally : entitylist->get_ally_heroes()) {
 				// Do ally on active Spell
@@ -983,6 +1001,11 @@ namespace nami {
 			if (bestR.enemyHitcount >= semiTargets && rMenu::semiKey->get_bool()) {
 				r->cast(bestR.direction);
 				if (generalMenu::debug->get_bool()) console->print("Semi R %i Enemies", bestR.enemyHitcount);
+				return;
+			}
+			if (bestR.enemyHitcount > 0 && orbwalker->flee_mode() && myhero->get_health_percent() < rMenu::flee->get_int()) {
+				r->cast(bestR.direction);
+				if (generalMenu::debug->get_bool()) console->print("Flee R %i Enemies", bestR.enemyHitcount);
 				return;
 			}
 		}
@@ -1305,7 +1328,25 @@ namespace nami {
 			qMenu::onSpecialSpells->set_tooltip("Fiora W, Long cast times");
 			qMenu::onStasis = qMenu->add_checkbox("onStasis", "On Stasis", true);
 			qMenu::onDashes = qMenu->add_combobox("onDashes", "On Dashes", { {"Off", nullptr},{"Prediction", nullptr}, {"Always", nullptr} }, 1);
-			
+			qMenu::dashWhitelist = qMenu->add_tab("dashWhitelist", "Whitelist for Dashes");
+			for (const auto& enemy : entitylist->get_enemy_heroes()) {
+				uint32_t id = enemy->get_network_id();
+				bool defaultVal = true;
+				if (enemy->get_champion() == champion_id::Yasuo || enemy->get_champion() == champion_id::Nilah || enemy->get_champion() == champion_id::Samira || enemy->get_champion() == champion_id::Akali || enemy->get_champion() == champion_id::Kalista) defaultVal = false;
+				qDashWhitelist[id] = qMenu::dashWhitelist->add_checkbox(std::to_string(id), Database::getDisplayName(enemy), defaultVal, false);
+				qDashWhitelist[id]->set_texture(enemy->get_square_icon_portrait());
+			}
+			qMenu->add_separator("sep2", "");
+			qMenu::range = qMenu->add_slider("range", "Range", 850, 750, 850);
+			qMenu::range->add_property_change_callback([](TreeEntry* entry) {
+				q->set_range(entry->get_int());
+				});
+			q->set_range(qMenu::range->get_int());
+			qMenu::toggleRadius = qMenu->add_hotkey("toggleCenter", "Try to hit Center", TreeHotkeyMode::Toggle, 0x49, true);
+			qMenu::toggleRadius->add_property_change_callback([](TreeEntry* entry) {
+				q->set_radius(200 -100 * entry->get_bool());
+				});
+			q->set_radius(200 - 100 * qMenu::toggleRadius->get_bool());
 		}
 		auto wMenu = mainMenuTab->add_tab("w", "W Settings");
 		{
@@ -1321,8 +1362,10 @@ namespace nami {
 			wMenu::useOnLowHP->add_separator("sep1", "0 to disable");
 			for (const auto& ally : entitylist->get_ally_heroes()) {
 				uint32_t id = ally->get_network_id();
-				wLowHPList[id] = wMenu::useOnLowHP->add_slider(std::to_string(id), ally->get_model(), 50 - 25*(myhero->get_handle() == ally->get_handle()), 0, 100, false);
+				wLowHPList[id] = wMenu::useOnLowHP->add_slider(std::to_string(id), Database::getDisplayName(ally), 50 - 25*(myhero->get_handle() == ally->get_handle()), 0, 100, false);
+				wLowHPList[id]->set_texture(ally->get_square_icon_portrait());
 			}
+			wMenu::wHealMana = wMenu->add_slider("wHealMana", "^Min % Mana to auto Heal", 50, 0, 100);
 
 		}
 		auto eMenu = mainMenuTab->add_tab("e", "E Settings");
@@ -1429,6 +1472,7 @@ namespace nami {
 			rMenu::semiTargets = rMenu->add_slider("semiTargets", "Min Targets for Semi R (0 to disable)", 2, 0, 5);
 			rMenu::semiSelected = rMenu->add_checkbox("semiSelected", "Force Semi R on selected", true);
 			rMenu::semiSelected->set_tooltip("If you click on someone to force that target (red circle under them), ignore how many it can hit");
+			rMenu::flee = rMenu->add_slider("flee", "Use R to flee if under x% HP", 30, 0, 100);
 		}
 		auto drawMenu = mainMenuTab->add_tab("drawings", "Drawings Settings");
 		{
@@ -1465,11 +1509,11 @@ namespace nami {
 		}
 		auto interruptMenu = mainMenuTab->add_tab("interrupt", "Interrupt Settings");
 		{
-			interruptMenu::useQ = interruptMenu->add_checkbox("useQ", "Use Q for Danger >= 1", true);
+			interruptMenu::useQ = interruptMenu->add_checkbox("useQ", "Use Q for Importance >= 1", true);
 			interruptMenu::useQ->set_texture(myhero->get_spell(spellslot::q)->get_icon_texture());
-			interruptMenu::useR = interruptMenu->add_checkbox("useR", "Use R for Danger >= 3", true);
+			interruptMenu::useR = interruptMenu->add_checkbox("useR", "Use R for Importance >= 3", true);
 			interruptMenu::useR->set_texture(myhero->get_spell(spellslot::r)->get_icon_texture());
-			interruptMenu::spelldb = interruptMenu->add_tab("interruptdb", "Spell Database");
+			interruptMenu::spelldb = interruptMenu->add_tab("interruptdb", "Importance Settings");
 			Database::InitializeCancelMenu(interruptMenu::spelldb);
 		}
 
@@ -1491,6 +1535,11 @@ namespace nami {
 				nexusPos = nexusEntity->get_position();
 		}
 		urfCannon = myhero->get_team() == game_object_team::order ? vector(13018.f, 14026.f) : vector(1506.f, 676.f);
+
+		permashow::instance.init(mainMenuTab);
+		permashow::instance.add_element("Hit Q Center", qMenu::toggleRadius);
+		permashow::instance.add_element("Semi R", rMenu::semiKey);
+
 		mainMenuTab->add_separator("version", VERSION);
 		mainMenuTab->add_separator("sep1", "Special Thanks to yorik100");
 	}
@@ -1501,6 +1550,7 @@ namespace nami {
 		plugin_sdk->remove_spell(r);
 		menu->delete_tab(mainMenuTab);
 
+		permashow::instance.destroy();
 
 		event_handler<events::on_draw>::remove_handler(on_draw);
 		event_handler<events::on_env_draw>::add_callback(on_env_draw);
