@@ -192,6 +192,7 @@ namespace nami {
 	namespace qMenu {
 		TreeEntry* hc;
 		TreeEntry* mode;
+		TreeEntry* notIfDashReady;
 		TreeEntry* onCC;
 		TreeEntry* onParticle;
 		TreeEntry* onSpecialSpells;
@@ -530,6 +531,33 @@ namespace nami {
 		return false;
 	}
 
+	float dashSpellReadyIn(game_object_script champ, spellslot slot) {
+		// This doesnt work for amumu q, jarvan eq, maybe naut q,
+		auto spell = champ->get_spell(slot);
+		auto state = champ->get_spell_state(slot);
+		if (spell && state)
+		{
+			bool isDash = spell->get_spell_data()->cantCastWhileRooted();
+			if (!isDash) return FLT_MAX;
+			if (state & spell_state::Ready) return 0;
+			float cooldown = spell->cooldown();
+			if (state & spell_state::Cooldown) return cooldown;
+			if ((state & spell_state::NotEnoughMana)) {
+				// TODO: Ar type? 1112014848? Mana? Seems to work with energy as well
+				float missingMana = champ->get_mana_for_spell(slot) - champ->get_mana();
+				return missingMana / myhero->mPARRegenRate();
+			}
+
+		}
+		return FLT_MAX;
+	}
+	float dashReadyIn(game_object_script champ) {
+		// i dont check for r because its worth it if they have to use it
+		std::vector<float> cds = { dashSpellReadyIn(champ, spellslot::q),dashSpellReadyIn(champ, spellslot::w) ,dashSpellReadyIn(champ, spellslot::e) ,dashSpellReadyIn(champ, spellslot::item_1) ,dashSpellReadyIn(champ, spellslot::item_2) ,dashSpellReadyIn(champ, spellslot::item_3) ,dashSpellReadyIn(champ, spellslot::item_4) ,dashSpellReadyIn(champ, spellslot::item_5) ,dashSpellReadyIn(champ, spellslot::item_6) };
+		float minCooldown = *std::min_element(cds.begin(), cds.end());
+		return minCooldown;
+	}
+
 	bool wAllyHeal(game_object_script ally) {
 		float wBaseHeal = 35 + 20 * w->level() + 0.25 * myhero->get_total_ability_power();
 		return ally->get_max_health() - ally->get_health() >= wBaseHeal * wMenu::minHealRatio->get_int() / 100.f;
@@ -618,6 +646,7 @@ namespace nami {
 		}
 		return 0;
 	}
+
 	hit_chance get_hitchance(const int hc)
 	{
 		switch (hc)
@@ -828,7 +857,7 @@ namespace nami {
 			bool modeCast = (qMenu::mode->get_int() == 0 && orbwalker->harass()) || (qMenu::mode->get_int() <= 1 && orbwalker->combo_mode());
 			if (modeCast) {
 				auto target = target_selector->get_target(q, damage_type::magical);
-				if (target && qPredictionList.find(target->get_handle())!=qPredictionList.end()) {
+				if (target && qPredictionList.find(target->get_handle())!=qPredictionList.end() && (!qMenu::notIfDashReady->get_bool() ||dashReadyIn(target)>q->delay)) {
 					auto& pred = qPredictionList[target->get_handle()];
 					if (pred.hitchance >= get_hitchance(qMenu::hc->get_int())) {
 						q->cast(pred.get_cast_position());
@@ -1032,7 +1061,7 @@ namespace nami {
 						if(pred.hitchance >= get_hitchance(rMenu::hc->get_int()))
 						{
 							r->cast(target);
-							if (generalMenu::debug->get_bool()) myhero->print_chat(0, "Interrupt R on %s", Database::getDisplayName(target).c_str());
+							if (generalMenu::debug->get_bool()) console->print("Interrupt R on %s", Database::getDisplayName(target).c_str());
 						}
 						r->set_range(rMenu::range->get_int());
 					}
@@ -1042,7 +1071,7 @@ namespace nami {
 						if (pred.hitchance >= get_hitchance(qMenu::hc->get_int()))
 						{
 							q->cast(target);
-							if (generalMenu::debug->get_bool()) myhero->print_chat(0, "Interrupt Q on %s", Database::getDisplayName(target).c_str());
+							if (generalMenu::debug->get_bool()) console->print("Interrupt Q on %s", Database::getDisplayName(target).c_str());
 						}
 					}
 
@@ -1351,6 +1380,7 @@ namespace nami {
 			qMenu->set_assigned_texture(myhero->get_spell(spellslot::q)->get_icon_texture());
 			qMenu::hc = qMenu->add_combobox("Hitchance", "Hitchance", { {"Medium", nullptr},{"High", nullptr},{"Very High", nullptr} }, 2);
 			qMenu::mode = qMenu->add_combobox("mode", "Q Mode", { {"Combo + Harass", nullptr},{"Combo", nullptr}, {"Off", nullptr} }, 0);
+			qMenu::notIfDashReady = qMenu->add_checkbox("notIfDashReady", "Try to not Q if Enemy has Dash", false);
 			qMenu->add_separator("sep1", "Auto Q");
 			qMenu::onCC = qMenu->add_checkbox("oncc", "On CC", true);
 			qMenu::onParticle = qMenu->add_checkbox("onParticle", "On Teleport-like Spells", true);
