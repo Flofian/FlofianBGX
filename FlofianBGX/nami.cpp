@@ -207,7 +207,7 @@ namespace nami {
 		TreeEntry* minTargets = nullptr;
 		TreeEntry* autoWTripleHit = nullptr;
 		TreeTab* useOnLowHP = nullptr;
-		TreeEntry* wHealMana = nullptr;
+		TreeEntry* wMana = nullptr;
 	}
 	namespace eMenu {
 		TreeEntry* mode = nullptr;
@@ -838,8 +838,9 @@ namespace nami {
 			}
 			// Auto Q
 			for (const auto& target : entitylist->get_enemy_heroes()) {
-				if (!target || !target->is_valid() || target->get_distance(myhero)>q->range() || target->is_dead() || qPredictionList.find(target->get_handle()) == qPredictionList.end()) continue;
+				if (!target || !target->is_valid()  || target->is_dead() || qPredictionList.find(target->get_handle()) == qPredictionList.end()) continue;
 				auto& pred = qPredictionList[target->get_handle()];
+				if (pred.get_cast_position().distance(myhero) > q->range()) continue;	// maybe change to current pos?
 				// Stasis
 				if (qMenu::onStasis->get_bool() && stasisInfo.find(target->get_handle()) != stasisInfo.end())
 				{
@@ -895,22 +896,23 @@ namespace nami {
 			// multi bounce logic
 			bool modeCast = (wMenu::mode->get_int() == 0 && orbwalker->harass()) || (wMenu::mode->get_int() <= 1 && orbwalker->combo_mode());
 			int modeMinTargets = wMenu::minTargets->get_int();
+			bool autoChecks = wMenu::autoWTripleHit->get_bool() && myhero->get_mana_percent() > wMenu::wMana->get_int() && !myhero->is_recalling();
 			for (const auto& ally : entitylist->get_ally_heroes()) {
 				if (ally->get_distance(myhero) > w->range()) continue;
 				int bt = countWBounces(ally);
-				if ((bt == 3 && wMenu::autoWTripleHit->get_bool()) || (modeCast && bt >= modeMinTargets)) w->cast(ally);
+				if ((bt == 3 && autoChecks) || (modeCast && bt >= modeMinTargets)) w->cast(ally);
 				
 			}
 			for (const auto& enemy : entitylist->get_enemy_heroes()) {
 				if (enemy->get_distance(myhero) > w->range() || !enemy->is_targetable() || !enemy->is_visible()) continue;
 				int b = countWBounces(enemy);
-				int minb = int(b / 10);
+				//int minb = int(b / 10);
 				int maxb = b % 10;
-				if ((maxb == 3 && wMenu::autoWTripleHit->get_bool()) || (modeCast && maxb >= modeMinTargets)) w->cast(enemy);
+				if ((maxb == 3 && autoChecks) || (modeCast && maxb >= modeMinTargets)) w->cast(enemy);
 			}
 
 			// auto low hp
-			if(myhero->get_mana_percent()>wMenu::wHealMana->get_int() && !myhero->is_recalling())
+			if(autoChecks)
 			{
 				for (const auto& ally : entitylist->get_ally_heroes()) {
 					if (ally->get_distance(myhero) > w->range() || ally->is_dead() || !ally->is_targetable()) continue;
@@ -1394,7 +1396,7 @@ namespace nami {
 				wLowHPList[id] = wMenu::useOnLowHP->add_slider(std::to_string(id), Database::getDisplayName(ally), 50 - 25*(myhero->get_handle() == ally->get_handle()), 0, 100, false);
 				wLowHPList[id]->set_texture(ally->get_square_icon_portrait());
 			}
-			wMenu::wHealMana = wMenu->add_slider("wHealMana", "^Min % Mana to auto Heal", 50, 0, 100);
+			wMenu::wMana = wMenu->add_slider("wMana", "Min % Mana to auto W", 50, 0, 100);
 
 		}
 		auto eMenu = mainMenuTab->add_tab("e", "E Settings");
