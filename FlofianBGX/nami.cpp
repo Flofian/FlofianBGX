@@ -563,7 +563,7 @@ namespace nami {
 			}
 			enemies.erase(std::remove_if(enemies.begin(), enemies.end(), [&](game_object_script x)
 				{
-					return !x->is_targetable() || !x->is_visible() || firstBouncePredList[x->get_network_id()].distance(firstTarget)> bounceRange;
+					return !x->is_targetable() || !x->is_visible() || x->is_dead() || firstBouncePredList[x->get_network_id()].distance(firstTarget)> bounceRange;
 				}), enemies.end());
 			if (enemies.size() == 0) return hitCount;
 			auto& nearestEnemy = *std::min_element(enemies.begin(), enemies.end(), [&](game_object_script a, game_object_script b) {
@@ -583,7 +583,7 @@ namespace nami {
 			}
 			allies.erase(std::remove_if(allies.begin(), allies.end(), [&](game_object_script x)
 				{
-					return !x->is_targetable() || secondBouncePredList[x->get_network_id()].distance(nearestEnemyPos) > bounceRange || 
+					return !x->is_targetable() || x->is_dead() || secondBouncePredList[x->get_network_id()].distance(nearestEnemyPos) > bounceRange ||
 						x->get_handle() == firstTarget->get_handle() || !wAllyHeal(x);
 				}), allies.end());
 			return hitCount + (allies.size() > 0);
@@ -594,7 +594,7 @@ namespace nami {
 			std::vector<int> bounceCountList = {};
 			for (const auto& ally : entitylist->get_ally_heroes()) {
 				auto allyPredPos = prediction->get_prediction(ally, travelTime).get_unit_position();
-				if (allyPredPos.distance(firstEnemyPos) > bounceRange) continue;
+				if (allyPredPos.distance(firstEnemyPos) > bounceRange || ally->is_dead() || !ally->is_targetable_to_team(myhero->get_team())) continue;
 				auto newTravelTime = travelTime + allyPredPos.distance(firstEnemyPos) / 1500;
 
 				auto enemies = entitylist->get_enemy_heroes();
@@ -604,7 +604,7 @@ namespace nami {
 				}
 				enemies.erase(std::remove_if(enemies.begin(), enemies.end(), [&](game_object_script x)
 					{
-						return !x->is_targetable() || !x->is_visible() || secondBouncePredList[x->get_network_id()].distance(allyPredPos) > bounceRange ||x->get_handle() == firstTarget->get_handle();
+						return !x->is_targetable() || !x->is_visible() || x->is_dead() || secondBouncePredList[x->get_network_id()].distance(allyPredPos) > bounceRange ||x->get_handle() == firstTarget->get_handle();
 					}), enemies.end());
 				int currentcount = 1 + wKillEnemy(firstTarget, 0) + wAllyHeal(ally) + (enemies.size() > 0);
 				// only count the ally if i actually heal, but allow bouncing even if i dont
