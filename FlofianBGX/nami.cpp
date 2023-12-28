@@ -621,6 +621,7 @@ namespace nami {
 			// Getting the final cast position
 			if (obj.isTeleport)
 			{
+				if (generalMenu::debug->get_bool()) console->print("Found Teleport");
 				obj.target = obj.obj->get_particle_attachment_object();
 				if (!obj.target)
 					obj.target = obj.obj->get_particle_target_attachment_object();
@@ -644,6 +645,7 @@ namespace nami {
 			// Check if cast position isn't too far enough
 			if (myhero->get_position().distance(obj.castingPos) > q->range() + q->get_radius()) continue;
 
+			console->print("Particle in range");
 			// Gathering enough data to cast on particles
 			float pings = ping->get_ping() / 1000.f;
 			const auto particleTime = (obj.time + obj.castTime) - gametime->get_time();
@@ -658,6 +660,7 @@ namespace nami {
 			if (canQ && (particleTime - pings + 0.2) <= q->get_delay())
 			{
 				q->cast(obj.castingPos.extend(myhero->get_position(), effectiveQDeviation));
+				console->print("Cast Q on Particle");
 				return;
 			}
 		}
@@ -715,7 +718,10 @@ namespace nami {
 		}
 		// Get guardian angel revive time if there is one
 		if (stasisTime > 0)
+		{
 			guardianReviveTime[target->get_handle()] = 0.f;
+			if(generalMenu::debug->get_bool()) console->print("Removed GAtime because stasis %s", target->get_model_cstr());
+		}
 		const auto reviveTime = guardianReviveTime[target->get_handle()];
 		const float GATime = (stasisTime <= 0 && reviveTime ? reviveTime - gametime->get_time() : 0);
 		if (stasisTime < GATime)
@@ -723,6 +729,7 @@ namespace nami {
 			stasisTime = GATime;
 			stasisStart = reviveTime - 4;
 			stasisEnd = reviveTime;
+			if (generalMenu::debug->get_bool()) console->print("Set stasis to revive %s", target->get_model_cstr());
 		}
 		const stasisStruct& stasisInfo = { .stasisTime = stasisTime, .stasisStart = stasisStart, .stasisEnd = stasisEnd };
 		const buffList& buffStruct = { .godBuff = godBuffTime, .noKillBuff = noKillBuffTime, .stasis = stasisInfo };
@@ -764,6 +771,11 @@ namespace nami {
 			godBuffTime[enemy->get_handle()] = listOfNeededBuffs.godBuff;
 			noKillBuffTime[enemy->get_handle()] = listOfNeededBuffs.noKillBuff;
 			stasisInfo[enemy->get_handle()] = listOfNeededBuffs.stasis;
+			if (!enemy->is_playing_animation(buff_hash("Death")))
+			{
+				if (generalMenu::debug->get_bool() && guardianReviveTime[enemy->get_handle()]>0) console->print("Removed GA Revive from %s", enemy->get_model_cstr());
+				guardianReviveTime[enemy->get_handle()] = -1;
+			}
 		}
 
 
@@ -782,15 +794,18 @@ namespace nami {
 			}
 			// Auto Q
 			for (const auto& target : entitylist->get_enemy_heroes()) {
-				if (!target || !target->is_valid() || target->get_distance(myhero)>q->range()) return;
+				if (!target || !target->is_valid() || target->get_distance(myhero)>q->range()) continue;
 				auto pred = qPredictionList[target->get_handle()];
 				
+				// Stasis
 				if (qMenu::onStasis->get_bool())
 				{
 					const auto stasisDuration = stasisInfo[target->get_handle()].stasisTime;
-					if (!((customIsValid(target) || stasisDuration > 0) && !target->is_zombie())) return;
+					if (!((customIsValid(target) || stasisDuration > 0) && !target->is_zombie())) continue;
+					
 					if (stasisDuration>0 && (stasisDuration + 0.2 - ping->get_ping() / 1000.f) < q->delay) {
 						q->cast(pred.get_cast_position());
+						if (generalMenu::debug->get_bool()) console->print("Cast Q on Stasis %s", target->get_model_cstr());
 					}
 				}
 				if (!target->is_valid_target(q->range(), vector(), true) || target->is_dead() || !target->is_visible() || target->get_is_cc_immune()) continue;
@@ -804,15 +819,16 @@ namespace nami {
 				// Special Spell
 				if (qMenu::onSpecialSpells->get_bool()) {
 					auto activeSpell = target->get_active_spell();
-					if (!activeSpell || activeSpell->get_spell_data()->is_insta() || activeSpell->get_spell_data()->mCanMoveWhileChanneling() || isCastMoving(target)) return;
+					if (!activeSpell || activeSpell->get_spell_data()->is_insta() || activeSpell->get_spell_data()->mCanMoveWhileChanneling() || isCastMoving(target)) continue;
 					auto castStartTime = activeSpell->cast_start_time();
 					auto castTime = activeSpell->get_spell_data()->mCastTime();
 					auto remainingTime = castStartTime - gametime->get_time() + castTime;
 					if (remainingTime > 0.8 && pred.hitchance>=hit_chance::low) {	// should be enough, not sure if there are any other than luxR and ezrealR
 						q->cast(pred.get_cast_position());
+						if (generalMenu::debug->get_bool()) console->print("Cast Q on Special %s", target->get_model_cstr());
+						return;
 					}
 				}
-				// Stasis
 
 			}
 			// particle Stuff
@@ -1026,19 +1042,23 @@ namespace nami {
 		//auto emitter = obj->get_emitter_resources_hash();
 		if (obj->is_missile()) {
 			auto senderID = obj->missile_get_sender_id();
-			if (!senderID) return;
-			auto sender = entitylist->get_object(senderID);
-			if (!sender || !sender->is_ally()) return;
-			auto h = obj->get_missile_sdata()->get_name_hash();
-			if (linSpellDB.find(h) != linSpellDB.end()) {
-				missileList.push_back(obj);
+			if (senderID)
+			{
+				auto sender = entitylist->get_object(senderID);
+				if (sender  && sender->is_ally())
+				{
+					auto h = obj->get_missile_sdata()->get_name_hash();
+					if (linSpellDB.find(h) != linSpellDB.end()) {
+						missileList.push_back(obj);
+					}
+					//console->print(obj->get_missile_sdata()->get_name_cstr());
+					/*if (h == spell_hash("NamiWMissileAlly") || h == spell_hash("NamiWMissileEnemy") || h == spell_hash("NamiWAlly") || h == spell_hash("NamiWEnemy")) {
+						console->print("Start Speed: %f", obj->missile_movement_get_current_speed());
+						console->print("Start Accel: %f", obj->missile_movement_get_acceleration_magnitude());
+						console->print("Target: %s", obj->missile_movement_get_target_unit()->get_model_cstr());
+					}*/
+				}
 			}
-			//console->print(obj->get_missile_sdata()->get_name_cstr());
-			/*if (h == spell_hash("NamiWMissileAlly") || h == spell_hash("NamiWMissileEnemy") || h == spell_hash("NamiWAlly") || h == spell_hash("NamiWEnemy")) {
-				console->print("Start Speed: %f", obj->missile_movement_get_current_speed());
-				console->print("Start Accel: %f", obj->missile_movement_get_acceleration_magnitude());
-				console->print("Target: %s", obj->missile_movement_get_target_unit()->get_model_cstr());
-			}*/
 		}
 
 		const auto object_hash = spell_hash_real(obj->get_name_cstr());
@@ -1103,6 +1123,7 @@ namespace nami {
 
 		if (object_hash == spell_hash("global_ss_teleport_turret_red.troy"))
 		{
+			if (generalMenu::debug->get_bool()) console->print("Found Teleport ");
 			const auto& target = obj->get_particle_attachment_object();
 			if (nexusPos != vector::zero)
 			{
@@ -1113,6 +1134,7 @@ namespace nami {
 		}
 		else if (object_hash == spell_hash("global_ss_teleport_target_red.troy"))
 		{
+			if (generalMenu::debug->get_bool()) console->print("Found Teleport 2");
 			const auto& target = obj->get_particle_target_attachment_object();
 			if (nexusPos != vector::zero)
 			{
@@ -1130,6 +1152,44 @@ namespace nami {
 					{
 						return missile->get_handle() == obj->get_handle();
 					}), missileList.end());
+		}
+	}
+	void on_buff(game_object_script& sender, buff_instance_script& buff, const bool gain)
+	{
+		if (!buff || !sender) return;
+
+		// Detects if someone is reviving from Guardian Angel
+		if (!gain && buff->get_hash_name() == buff_hash("willrevive") && sender->is_playing_animation(buff_hash("Death")) && sender->has_item(ItemId::Guardian_Angel) != spellslot::invalid)
+		{
+			if (generalMenu::debug->get_bool()) console->print("%s will ga revive", sender->get_model_cstr());
+			guardianReviveTime[sender->get_handle()] = deathAnimTime[sender->get_handle()] + 4;
+			return;
+		}
+	}
+
+	void on_buff_gain(game_object_script sender, buff_instance_script buff)
+	{
+		// Grouping on buff gain && on buff lose together
+		on_buff(sender, buff, true);
+	}
+
+	void on_buff_lose(game_object_script sender, buff_instance_script buff)
+	{
+		// Grouping on buff gain && on buff lose together
+		on_buff(sender, buff, false);
+	}
+	void on_network_packet(game_object_script sender, std::uint32_t network_id, pkttype_e type, void* args)
+	{
+		if (type != pkttype_e::PKT_S2C_PlayAnimation_s || !sender) return;
+
+		const auto& data = (PKT_S2C_PlayAnimationArgs*)args;
+		if (!data) return;
+		if (generalMenu::debug->get_bool()) console->print("Found Animation %s on %s", data->animation_name, sender->get_model_cstr());
+
+		if (strcmp(data->animation_name, "Death") == 0)
+		{
+			deathAnimTime[sender->get_handle()] = gametime->get_time();
+			if (generalMenu::debug->get_bool()) console->print("Set DeathAnimTime to %f on %s", gametime->get_time(), sender->get_model_cstr());
 		}
 	}
 
@@ -1332,6 +1392,9 @@ namespace nami {
 		event_handler<events::on_process_spell_cast>::add_callback(on_process_spell_cast);
 		event_handler<events::on_create_object>::add_callback(on_create_object);
 		event_handler<events::on_delete_object>::add_callback(on_delete_object);
+		event_handler<events::on_buff_gain>::add_callback(on_buff_gain);
+		event_handler<events::on_buff_lose>::add_callback(on_buff_lose);
+		event_handler<events::on_network_packet>::add_callback(on_network_packet);
 
 		const auto nexusPosIt = std::find_if(entitylist->get_all_nexus().begin(), entitylist->get_all_nexus().end(), [](const game_object_script& x) { return x != nullptr && x->is_valid() && x->is_enemy(); });
 		if (nexusPosIt != entitylist->get_all_nexus().end())
@@ -1358,5 +1421,8 @@ namespace nami {
 		event_handler<events::on_process_spell_cast>::remove_handler(on_process_spell_cast);
 		event_handler<events::on_create_object>::remove_handler(on_create_object);
 		event_handler<events::on_delete_object>::remove_handler(on_delete_object);
+		event_handler<events::on_buff_gain>::remove_handler(on_buff_gain);
+		event_handler<events::on_buff_lose>::remove_handler(on_buff_lose);
+		event_handler<events::on_network_packet>::remove_handler(on_network_packet);
 	}
 }
