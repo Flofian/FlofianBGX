@@ -960,15 +960,16 @@ namespace nami {
 				auto activeSpell = ally->get_active_spell();
 				if (!activeSpell) continue;
 				auto target = entitylist->get_object(activeSpell->get_last_target_id());
-				bool isTargeted = activeSpell->get_spell_data()->get_targeting_type() == spell_targeting::target;
-				bool isTargetingEnemy = target && target->is_valid() && target->is_enemy() && target->is_ai_hero();
 				bool isAuto = activeSpell->is_auto_attack() && !ally->is_winding_up();
+				bool isTargeted = activeSpell->get_spell_data()->get_targeting_type() == spell_targeting::target || isAuto;
+				bool isTargetingEnemy = target && target->is_valid() && target->is_enemy() && target->is_ai_hero();
+				//if (isAuto && target && generalMenu::debug->get_bool()) console->print("%s Autoattack on %s, is enemy: %i",ally->get_model_cstr(), target->get_model_cstr(), isTargetingEnemy);
 				std::string spellName = spellSlotName(activeSpell);
 				if (spellName == "") continue; // Unsupported Spell, items, idk
 				bool isSupported = supportedSpells.find(ally->get_model_cstr() + spellName) != supportedSpells.end();
 				bool isEnabled = isSupported ? tab->get_entry(spellName)->get_int() == 2 : tab->get_entry(spellName)->get_bool();
 				// this can be compressed, but i keep it like this for clarity
-				bool useE = (overwrite == 0 && isEnabled && (!isTargeted || isTargetingEnemy)) ||
+				bool useE = (overwrite == 0 && isEnabled && ((!isTargeted && !isAuto) || isTargetingEnemy)) ||
 							(overwrite == 1 && isTargeted && isTargetingEnemy && isEnabled) ||
 							(overwrite == 2 && isAuto && isEnabled) ||
 							(overwrite == 3 && isTargeted && isTargetingEnemy) ||
