@@ -108,7 +108,14 @@ namespace nami {
 	std::vector<linSpell> linearSpells;
 	std::vector<game_object_script> missileList;
 	std::map<uint32_t, TreeEntry*> wLowHPList;
+	std::unordered_map<uint32_t, prediction_output> qPredictionList;
+	std::unordered_map<uint32_t, prediction_output> rPredictionList;
 
+	struct rPos {
+		vector direction;
+		int enemyHitcount;
+		int allyHitcount;	// not sure yet if i do that
+	};
 
 	// thank you yorik100, i love you
 	struct stasisStruct {
@@ -168,7 +175,6 @@ namespace nami {
 		spell_hash("VladimirSanguinePool")
 	};
 
-	std::unordered_map<uint32_t, prediction_output> qPredictionList;
 	std::vector<particleStruct> particlePredList;
 	vector nexusPos;
 	vector urfCannon;
@@ -206,6 +212,10 @@ namespace nami {
 	namespace rMenu {
 		TreeEntry* range = nullptr;
 		TreeEntry* hc = nullptr;
+		TreeEntry* comboTargets = nullptr;
+		TreeEntry* semiKey = nullptr;
+		TreeEntry* semiTargets = nullptr;
+		TreeEntry* semiSelected = nullptr;
 	}
 	namespace drawMenu {
 		TreeEntry* drawOnlyReady = nullptr;
@@ -221,7 +231,6 @@ namespace nami {
 		TreeEntry* qColor = nullptr;
 		TreeEntry* wColor = nullptr;
 		TreeEntry* eColor = nullptr;
-		TreeEntry* eSpellColor = nullptr;
 		TreeEntry* rColor = nullptr;
 	}
 	namespace interruptMenu {
@@ -760,13 +769,27 @@ namespace nami {
 		const auto isValid = !isCastingImmortalitySpell && ((target->is_valid_target(range, from, invul) && target->is_targetable() && target->is_targetable_to_team(myhero->get_team()) && !target->is_invulnerable()));
 		return isValid;
 	}
-
+	rPos getBestRPos() {
+		rPos bestRPos = { .direction = vector(), .enemyHitcount = 0 ,.allyHitcount = 0};
+		for (const auto& mainTarget : entitylist->get_enemy_heroes()) {
+			rPos currentRPos = { .direction = rPredictionList[mainTarget->get_handle()].get_cast_position(), .enemyHitcount = 0,.allyHitcount = 0};
+			for (const game_object_script& enemy : entitylist->get_enemy_heroes()) {
+				if (enemy->is_dead() || enemy->is_zombie() || !enemy->is_visible() || enemy->get_is_cc_immune()) continue;
+				auto rect = geometry::rectangle(myhero->get_position(), myhero->get_position() + ((currentRPos.direction - myhero->get_position()).normalized() * r->range()), r->radius + enemy->get_bounding_radius()).to_polygon();
+				auto pred = rPredictionList[enemy->get_handle()];
+				if (rect.is_inside(pred.get_unit_position()) && pred.hitchance >= get_hitchance(rMenu::hc->get_int())) currentRPos.enemyHitcount++;
+			}
+			if (currentRPos.enemyHitcount > bestRPos.enemyHitcount) bestRPos = currentRPos;
+		}
+		return bestRPos;
+	}
 	void on_update() {
 		// TODO: either give user control or just use either min or max
 		update_spells();
 		// tbh i think i just dont do a combo and a harass method and just do all in here
 		for (const auto& enemy : entitylist->get_enemy_heroes()) {
 			qPredictionList[enemy->get_handle()] = q->get_prediction(enemy);
+			rPredictionList[enemy->get_handle()] = r->get_prediction(enemy);
 			// man thank you yorik
 			const buffList listOfNeededBuffs = combinedBuffChecks(enemy);
 			godBuffTime[enemy->get_handle()] = listOfNeededBuffs.godBuff;
@@ -778,7 +801,6 @@ namespace nami {
 				guardianReviveTime[enemy->get_handle()] = -1;
 			}
 		}
-
 
 		if (q->is_ready()) {
 			// Combo/Harass Cast
@@ -847,8 +869,6 @@ namespace nami {
 				particleHandling();
 		}
 
-
-		// W Logic
 		if (w->is_ready())
 		{
 			// multi bounce logic
@@ -875,7 +895,6 @@ namespace nami {
 			}
 		}
 		
-		// E Logic
 		int eMode = eMenu::mode->get_int();
 		if (e->is_ready() && (eMode == 0 || (eMode == 1 && orbwalker->harass()) || (eMode <= 2 && orbwalker->combo_mode()))) {
 			int overwrite = eMenu::overwrite->get_int();
@@ -943,6 +962,28 @@ namespace nami {
 						return;
 					}
 				}
+			}
+		}
+
+		if (r->is_ready()) {
+			auto selected = target_selector->get_selected_target();
+			auto comboTargets = rMenu::comboTargets->get_int();
+			auto semiTargets = rMenu::semiTargets->get_int();
+			if (selected && rMenu::semiSelected->get_bool() && rMenu::semiKey->get_bool()) {
+				r->cast(rPredictionList[selected->get_handle()].get_cast_position());
+				if (generalMenu::debug->get_bool()) console->print("Semi R Selected %s", selected->get_model_cstr());
+				return;
+			}
+			rPos bestR = getBestRPos();
+			if (bestR.enemyHitcount >= comboTargets && orbwalker->combo_mode()) {
+				r->cast(bestR.direction);
+				if (generalMenu::debug->get_bool()) console->print("Combo R %i Enemies", bestR.enemyHitcount);
+				return;
+			}
+			if (bestR.enemyHitcount >= semiTargets && rMenu::semiKey->get_bool()) {
+				r->cast(bestR.direction);
+				if (generalMenu::debug->get_bool()) console->print("Semi R %i Enemies", bestR.enemyHitcount);
+				return;
 			}
 		}
 
@@ -1038,7 +1079,19 @@ namespace nami {
 
 	
 	void on_env_draw() {
+		if (myhero->is_dead())
+		{
+			return;
+		}
 
+		if ((q->is_ready() || !drawMenu::drawOnlyReady->get_bool()) && drawMenu::drawRangeQ->get_bool())
+			draw_manager->add_circle(myhero->get_position(), q->range(), colorMenu::qColor->get_color());
+		if ((w->is_ready() || !drawMenu::drawOnlyReady->get_bool()) && drawMenu::drawRangeW->get_bool())
+			draw_manager->add_circle(myhero->get_position(), w->range(), colorMenu::wColor->get_color());
+		if ((e->is_ready() || !drawMenu::drawOnlyReady->get_bool()) && drawMenu::drawRangeE->get_bool())
+			draw_manager->add_circle(myhero->get_position(), e->range(), colorMenu::eColor->get_color());
+		if ((r->is_ready() || !drawMenu::drawOnlyReady->get_bool()) && drawMenu::drawRangeR->get_bool())
+			draw_manager->add_circle(myhero->get_position(), r->range(), colorMenu::rColor->get_color());
 	}
 
 	void on_process_spell_cast(game_object_script sender, spell_instance_script spell) {
@@ -1172,11 +1225,18 @@ namespace nami {
 	void on_delete_object(game_object_script obj) {
 
 		if (obj->is_missile()) {
-			if (entitylist->get_object(obj->missile_get_sender_id())->is_ally())
-				missileList.erase(std::remove_if(missileList.begin(), missileList.end(), [obj](game_object_script& missile)
-					{
-						return missile->get_handle() == obj->get_handle();
-					}), missileList.end());
+			auto senderID = obj->missile_get_sender_id();
+			if (senderID)
+			{
+				auto sender = entitylist->get_object(senderID);
+				if (sender && sender->is_ally())
+				{
+					missileList.erase(std::remove_if(missileList.begin(), missileList.end(), [obj](game_object_script& missile)
+						{
+							return missile->get_handle() == obj->get_handle();
+						}), missileList.end());
+				}
+			}
 		}
 	}
 	void on_buff(game_object_script& sender, buff_instance_script& buff, const bool gain)
@@ -1207,7 +1267,7 @@ namespace nami {
 
 		const auto& data = (PKT_S2C_PlayAnimationArgs*)args;
 		if (!data) return;
-		if (generalMenu::debug->get_bool()) console->print("Found Animation %s on %s", data->animation_name, sender->get_model_cstr());
+		//if (generalMenu::debug->get_bool()) console->print("Found Animation %s on %s", data->animation_name, sender->get_model_cstr());
 
 		if (strcmp(data->animation_name, "Death") == 0)
 		{
@@ -1230,7 +1290,7 @@ namespace nami {
 		mainMenuTab->set_assigned_texture(myhero->get_square_icon_portrait());
 		auto generalMenu = mainMenuTab->add_tab("general", "General Settings");
 		{
-			generalMenu::debug = generalMenu->add_checkbox("debug", "Debug Prints", true);
+			generalMenu::debug = generalMenu->add_checkbox("debug", "Debug Prints", false);
 		}
 		auto qMenu = mainMenuTab->add_tab("q", "Q Settings");
 		{
@@ -1244,7 +1304,7 @@ namespace nami {
 			qMenu::onSpecialSpells = qMenu->add_checkbox("onSpecialSpells", "On Special Spells", true);
 			qMenu::onSpecialSpells->set_tooltip("Fiora W, Long cast times");
 			qMenu::onStasis = qMenu->add_checkbox("onStasis", "On Stasis", true);
-			qMenu::onDashes = qMenu->add_combobox("onDashes", "On Dashes", { {"Off", nullptr},{"Pred", nullptr}, {"Always", nullptr} }, 1);
+			qMenu::onDashes = qMenu->add_combobox("onDashes", "On Dashes", { {"Off", nullptr},{"Prediction", nullptr}, {"Always", nullptr} }, 1);
 			
 		}
 		auto wMenu = mainMenuTab->add_tab("w", "W Settings");
@@ -1364,6 +1424,11 @@ namespace nami {
 				});
 			r->set_range(rMenu::range->get_int());// when loading
 			rMenu::hc = rMenu->add_combobox("Hitchance", "Hitchance", { {"Medium", nullptr},{"High", nullptr},{"Very High", nullptr} }, 2);
+			rMenu::comboTargets = rMenu->add_slider("comboTargets", "Min Targets in Combo (0 to disable)", 3, 0, 5);
+			rMenu::semiKey = rMenu->add_hotkey("semiKey", "Semi Key", TreeHotkeyMode::Hold, 5, true);
+			rMenu::semiTargets = rMenu->add_slider("semiTargets", "Min Targets for Semi R (0 to disable)", 2, 0, 5);
+			rMenu::semiSelected = rMenu->add_checkbox("semiSelected", "Force Semi R on selected", true);
+			rMenu::semiSelected->set_tooltip("If you click on someone to force that target (red circle under them), ignore how many it can hit");
 		}
 		auto drawMenu = mainMenuTab->add_tab("drawings", "Drawings Settings");
 		{
@@ -1380,8 +1445,8 @@ namespace nami {
 			drawMenu::drawRangeR->set_texture(myhero->get_spell(spellslot::r)->get_icon_texture());
 
 			drawMenu->add_separator("sep1", "Debug Settings");
-			drawMenu::drawWTargets = drawMenu->add_checkbox("drawWTargets", "Draw W Hitcount", true);
-			drawMenu::drawESpells = drawMenu->add_checkbox("drawESpells", "Draw Spells for E", true);
+			drawMenu::drawWTargets = drawMenu->add_checkbox("drawWTargets", "Draw W Hitcount", false);
+			drawMenu::drawESpells = drawMenu->add_checkbox("drawESpells", "Draw Spells for E", false);
 			drawMenu::drawWTargets->set_texture(myhero->get_spell(spellslot::w)->get_icon_texture());
 			drawMenu::drawESpells->set_texture(myhero->get_spell(spellslot::e)->get_icon_texture());
 
@@ -1395,8 +1460,6 @@ namespace nami {
 			colorMenu::wColor = colorMenu->add_colorpick("colorW", "W Range Color", wcolor);
 			float ecolor[] = { 1.f, 0.f, 1.f, 1.f };
 			colorMenu::eColor = colorMenu->add_colorpick("colorE", "E Range Color", ecolor);
-			float epcolor[] = { 0.f, 1.f, 0.f, 1.f };
-			colorMenu::eSpellColor = colorMenu->add_colorpick("colorESeplls", "E Spell Color", epcolor);
 			float rcolor[] = { 1.f, 1.f, 0.f, 1.f };
 			colorMenu::rColor = colorMenu->add_colorpick("colorR", "R Range Color", rcolor);
 		}
