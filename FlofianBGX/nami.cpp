@@ -188,6 +188,7 @@ namespace nami {
 		TreeEntry* onParticle;
 		TreeEntry* onSpecialSpells;
 		TreeEntry* onStasis;
+		TreeEntry* onDashes;
 	}
 	namespace wMenu {
 		TreeEntry* minHealRatio = nullptr;
@@ -794,22 +795,21 @@ namespace nami {
 			}
 			// Auto Q
 			for (const auto& target : entitylist->get_enemy_heroes()) {
-				if (!target || !target->is_valid() || target->get_distance(myhero)>q->range()) continue;
+				if (!target || !target->is_valid() || target->get_distance(myhero)>q->range() || target->is_dead()) continue;
 				auto pred = qPredictionList[target->get_handle()];
-				
 				// Stasis
 				if (qMenu::onStasis->get_bool())
 				{
 					const auto stasisDuration = stasisInfo[target->get_handle()].stasisTime;
-					if (!((customIsValid(target) || stasisDuration > 0) && !target->is_zombie())) continue;
-					
-					if (stasisDuration>0 && (stasisDuration + 0.2 - ping->get_ping() / 1000.f) < q->delay) {
-						q->cast(pred.get_cast_position());
-						if (generalMenu::debug->get_bool()) console->print("Cast Q on Stasis %s", target->get_model_cstr());
+					if (((customIsValid(target) || stasisDuration > 0) && !target->is_zombie()))					
+					{
+						if (stasisDuration > 0 && (stasisDuration + 0.2 - ping->get_ping() / 1000.f) < q->delay) {
+							q->cast(pred.get_cast_position());
+							if (generalMenu::debug->get_bool()) console->print("Cast Q on Stasis %s", target->get_model_cstr());
+						}
 					}
 				}
-				if (!target->is_valid_target(q->range(), vector(), true) || target->is_dead() || !target->is_visible() || target->get_is_cc_immune()) continue;
-				
+				if (!target->is_valid_target(q->range(), myhero->get_position(), true) || target->is_zombie() || !target->is_visible() || target->get_is_cc_immune()) continue;
 				// On CC
 				if (qMenu::onCC->get_bool() && target->get_immovibility_time() > q->delay && pred.hitchance>=hit_chance::low)
 				{
@@ -819,13 +819,24 @@ namespace nami {
 				// Special Spell
 				if (qMenu::onSpecialSpells->get_bool()) {
 					auto activeSpell = target->get_active_spell();
-					if (!activeSpell || activeSpell->get_spell_data()->is_insta() || activeSpell->get_spell_data()->mCanMoveWhileChanneling() || isCastMoving(target)) continue;
-					auto castStartTime = activeSpell->cast_start_time();
-					auto castTime = activeSpell->get_spell_data()->mCastTime();
-					auto remainingTime = castStartTime - gametime->get_time() + castTime;
-					if (remainingTime > 0.8 && pred.hitchance>=hit_chance::low) {	// should be enough, not sure if there are any other than luxR and ezrealR
+					if (activeSpell && !activeSpell->get_spell_data()->is_insta() && !activeSpell->get_spell_data()->mCanMoveWhileChanneling() && !isCastMoving(target))
+					{
+						auto castStartTime = activeSpell->cast_start_time();
+						auto castTime = activeSpell->get_spell_data()->mCastTime();
+						auto remainingTime = castStartTime - gametime->get_time() + castTime;
+						if (remainingTime > 0.8 && pred.hitchance >= hit_chance::low) {	// should be enough, not sure if there are any other than luxR and ezrealR Also maybe change to hitchance immobile
+							q->cast(pred.get_cast_position());
+							if (generalMenu::debug->get_bool()) console->print("Cast Q on Special %s", target->get_model_cstr());
+							return;
+						}
+					}
+				}
+				// Dashes
+				if (qMenu::onDashes->get_int()!=0) {
+					//if (generalMenu::debug->get_bool()) console->print("%s is dashing: %i", target->get_model_cstr(), target->is_dashing());
+					if ((qMenu::onDashes->get_int() == 2 && target->is_dashing()) || (pred.hitchance == hit_chance::dashing && qMenu::onDashes->get_int() == 1)) {	// TODO: check if && needed or only check hitchance
 						q->cast(pred.get_cast_position());
-						if (generalMenu::debug->get_bool()) console->print("Cast Q on Special %s", target->get_model_cstr());
+						if (generalMenu::debug->get_bool()) console->print("Cast Q on Dash %s", target->get_model_cstr());
 						return;
 					}
 				}
@@ -1233,6 +1244,7 @@ namespace nami {
 			qMenu::onSpecialSpells = qMenu->add_checkbox("onSpecialSpells", "On Special Spells", true);
 			qMenu::onSpecialSpells->set_tooltip("Fiora W, Long cast times");
 			qMenu::onStasis = qMenu->add_checkbox("onStasis", "On Stasis", true);
+			qMenu::onDashes = qMenu->add_combobox("onDashes", "On Dashes", { {"Off", nullptr},{"Pred", nullptr}, {"Always", nullptr} }, 1);
 			
 		}
 		auto wMenu = mainMenuTab->add_tab("w", "W Settings");
