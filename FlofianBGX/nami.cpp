@@ -856,7 +856,7 @@ namespace nami {
 				if (qMenu::onSpecialSpells->get_bool()) {
 					auto activeSpell = target->get_active_spell();
 					auto data = activeSpell->get_spell_data();
-					if (activeSpell && !data->is_insta() && !data->mCanMoveWhileChanneling() && !isCastMoving(target) && data->get_name_hash() != spell_hash("YoneR"))	// hardcoded since fuck this guy
+					if (activeSpell && !data->is_insta() && !data->mCanMoveWhileChanneling() && !isCastMoving(target) && target->get_champion() != champion_id::Yone)	// hardcoded since fuck this guy
 					{
 						auto castStartTime = activeSpell->cast_start_time();
 						auto castTime = activeSpell->get_spell_data()->mCastTime();
