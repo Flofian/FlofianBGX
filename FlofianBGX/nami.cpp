@@ -1482,7 +1482,7 @@ namespace nami {
 				}
 				else
 				{
-					rt = tab->add_checkbox("R", "R", ally->get_spell(spellslot::q)->get_spell_data()->get_targeting_type() == spell_targeting::target);
+					rt = tab->add_checkbox("R", "R", ally->get_spell(spellslot::r)->get_spell_data()->get_targeting_type() == spell_targeting::target);
 				}
 				qt->set_texture(ally->get_spell(spellslot::q)->get_icon_texture());
 				wt->set_texture(ally->get_spell(spellslot::w)->get_icon_texture());
