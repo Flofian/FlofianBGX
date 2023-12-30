@@ -28,6 +28,8 @@ namespace nautilus {
 		TreeEntry* comboQ = nullptr;
 		TreeEntry* harassQ = nullptr;
 		TreeEntry* interrupt = nullptr;
+		TreeEntry* bestWallHK = nullptr;
+		TreeEntry* wallMinDistance = nullptr;
 	}
 	namespace wMenu {
 		TreeEntry* autoShield = nullptr;
@@ -55,6 +57,7 @@ namespace nautilus {
 		TreeEntry* drawRangeQ = nullptr;
 		TreeEntry* drawRangeE = nullptr;
 		TreeEntry* drawRangeR = nullptr;
+		TreeEntry* drawQWall = nullptr;
 	}
 	namespace colorMenu
 	{
@@ -92,6 +95,54 @@ namespace nautilus {
 		return !myhero->has_buff({ 
 			buff_hash("ASSETS/Perks/Styles/Inspiration/GlacialAugment/GlacialAugmentCooldown.lua"),
 			buff_hash("ASSETS/Perks/Styles/Resolve/VeteranAftershock/VeteranAftershockCooldownBuff.lua")});
+	}
+
+	vector firstWallHit(vector targetpos, int minHits = 1) {
+		vector castVector = (targetpos - myhero->get_position()).normalized() * q->range();
+		int wallHits = 0;
+		vector first = vector();
+		for (int i = 0; i <= 100; i++) {
+			vector p = castVector * i / 100.f + myhero->get_position();
+			if (p.is_wall()) 
+			{
+				wallHits++;
+				if (first == vector()) first = p;
+			}
+		}
+		return (wallHits > minHits) ? first : vector();
+	}
+	vector firstWallHitByDirection(vector castVector, int minHits = 1) {
+		int wallHits = 0;
+		vector first = vector();
+		for (int i = 0; i <= 100; i++) {
+			vector p = castVector * i / 100.f + myhero->get_position();
+			if (p.is_wall()) wallHits++;
+			if (p.is_wall())
+			{
+				wallHits++;
+				if (first == vector()) first = p;
+			}
+		}
+		return (wallHits > minHits) ? first : vector();
+	}
+	vector bestWallQPos() {
+		auto mouse = hud->get_hud_input_logic()->get_game_cursor_position();
+		auto qVector = (mouse - myhero->get_position()).normalized() * q->range();
+		vector furthestPos = myhero->get_position();
+		float maxAngleDegrees = 30;
+		float stepsPerDegree = 10;
+		float steps = stepsPerDegree * maxAngleDegrees;
+		float degreeStepSize = M_PI / (180.f * stepsPerDegree);
+		for (int i = 0; i < 2 * steps; i++) {
+			// i go 1 to the right, then 2 to the left (so 1 left from start), 3 right (2 right from start), 4 left (2 left from start), ...
+			qVector = qVector.rotated(degreeStepSize * i * pow(-1, ((i + 1) % 2) + 1));	// looks ugly, but i want to have **2 when 0, ** 1 when 1, ...
+			auto wallHit = firstWallHitByDirection(qVector, 8);
+			if (wallHit == vector()) continue;
+			// the subtraction helps to prefer targets near mouse, even if further away from mouse have a bit more distance
+			if (wallHit.distance(myhero) - (i / stepsPerDegree) / 2 > furthestPos.distance(myhero) && wallHit.distance(myhero) > qMenu::wallMinDistance->get_int()) furthestPos = wallHit;
+		}
+
+		return furthestPos;
 	}
 
 	vector getQCastPos(game_object_script target, bool ignore_spellshield = false) {
@@ -237,6 +288,11 @@ namespace nautilus {
 			return;
 		//auto first for interrupt
 		automatic();
+		if (qMenu::bestWallHK->get_bool()) {
+			auto bestWall = bestWallQPos();
+			// i check min distance again? but should also work if i distance to me > 0? but is still distance check so no difference
+			if (bestWall.distance(myhero) > qMenu::wallMinDistance->get_int()) q->cast(bestWall);
+		}
 		if (orbwalker->combo_mode()) combo();
 		if (orbwalker->harass()) harass();
 	}
@@ -246,13 +302,23 @@ namespace nautilus {
 		{
 			return;
 		}
+		if ((q->is_ready() || !drawMenu::drawOnlyReady->get_bool()) && drawMenu::drawQWall->get_bool())
+		{
+			auto bestWall = bestWallQPos();
+			if (bestWall.distance(myhero) > qMenu::wallMinDistance->get_int()) draw_manager->add_circle(bestWall, 20, MAKE_COLOR(0,255,255,255));
+		}
 		if (generalMenu::debug->get_bool()){
 			auto mouse = hud->get_hud_input_logic()->get_game_cursor_position();
-			for (int i = 0; i <= 1060; i+=5) {
-				auto p = ((mouse - myhero->get_position()).normalized() * i)+myhero->get_position();
-				auto c = p.is_wall() ? MAKE_COLOR(255, 0, 0, 255) : MAKE_COLOR(0, 255, 0, 255);
+			auto mouse1 = (mouse - myhero->get_position()).normalized() * 1100 + myhero->get_position();
+			draw_manager->add_text(myhero->get_position(), MAKE_COLOR(0, 0, 255, 255), 30, "%i", firstWallHit(mouse1,5) != vector());
+			vector castVector = (mouse - myhero->get_position()).normalized() * 1100;
+			for (int i = 0; i <= 100; i++) {
+				vector p = castVector * i / 100.f + myhero->get_position();
+				auto c = p.is_wall() ? MAKE_COLOR(255,0,0,255) : MAKE_COLOR(0,255,0,255);
 				draw_manager->add_circle(p, 2.5f, c);
 			}
+			//draw_manager->add_circle(bestWallQPos(), 20, MAKE_COLOR(0, 255, 255, 255));
+
 			for (const game_object_script& enemy : entitylist->get_enemy_heroes()) {
 				auto rhits = countRTargets(enemy);
 				if (enemy->get_position().distance(myhero)<rMenu::range->get_int())
@@ -299,7 +365,7 @@ namespace nautilus {
 		e = plugin_sdk->register_spell(spellslot::e, 590);
 		r = plugin_sdk->register_spell(spellslot::r, 825);
 		q->set_skillshot(0.25, 90, 2000, { collisionable_objects::minions, collisionable_objects::yasuo_wall}, skillshot_type::skillshot_line);
-		
+
 		
 		mainMenuTab = menu->create_tab("Flofian_Nautilus", "Flofian Nautilus");
 		mainMenuTab->set_assigned_texture(myhero->get_square_icon_portrait());
@@ -328,6 +394,9 @@ namespace nautilus {
 				qMenu::comboQ = qMenu->add_checkbox("comboQ", "Use Q in Combo", true);
 				qMenu::harassQ = qMenu->add_checkbox("harassQ", "Use Q in Harass", true);
 				qMenu::interrupt = qMenu->add_checkbox("interrupt", "Use Q to interrupt Spells with Importance >= 2", true);
+				qMenu::bestWallHK = qMenu->add_hotkey("bestWall", "Q to hook towards best Wall near Mouse", TreeHotkeyMode::Hold, 5, false);
+				qMenu::bestWallHK->set_tooltip("Might have problems with Height Diffrence (River)");
+				qMenu::wallMinDistance = qMenu->add_slider("wallMinDistance", "^ Min Distance to Wall", 500, 100, 1000);
 			}
 
 			auto wMenu = mainMenuTab->add_tab("W", "W Settings");
@@ -372,6 +441,9 @@ namespace nautilus {
 				drawMenu::drawRangeQ = drawMenu->add_checkbox("drawQ", "Draw Q range", true);
 				drawMenu::drawRangeE = drawMenu->add_checkbox("drawE", "Draw E range", true);
 				drawMenu::drawRangeR = drawMenu->add_checkbox("drawR", "Draw R range", true);
+				drawMenu->add_separator("sep1", "");
+				drawMenu::drawQWall = drawMenu->add_checkbox("drawQWall", "Draw Q Wall target", true);
+				drawMenu->add_separator("sep2", "");
 
 				auto colorMenu = drawMenu->add_tab("color", "Color Settings");
 
