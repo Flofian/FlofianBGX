@@ -12,6 +12,7 @@ namespace nami {
 	script_spell* w = nullptr;
 	script_spell* e = nullptr;
 	script_spell* r = nullptr;
+	script_spell* smallQ = nullptr;
 
 	TreeTab* mainMenuTab = nullptr;
 
@@ -111,6 +112,7 @@ namespace nami {
 	std::map<uint32_t, TreeEntry*> wLowHPList;
 	std::map<uint32_t, TreeEntry*> qDashWhitelist;
 	std::unordered_map<uint32_t, prediction_output> qPredictionList;
+	std::unordered_map<uint32_t, prediction_output> smallQPredictionList;
 	std::unordered_map<uint32_t, prediction_output> rPredictionList;
 
 	struct rPos {
@@ -718,7 +720,7 @@ namespace nami {
 			
 		
 			// Try to cast Q if possible
-			if (canQ && (particleTime - pings + 0.2) <= q->get_delay())
+			if (canQ && (particleTime - pings + 0.25) <= q->get_delay())	//It missed once on a teleport so i try 0.25 instead of 0.2?
 			{
 				q->cast(obj.castingPos.extend(myhero->get_position(), effectiveQDeviation));
 				console->print("Cast Q on Particle");
@@ -840,6 +842,7 @@ namespace nami {
 		// tbh i think i just dont do a combo and a harass method and just do all in here
 		for (const auto& enemy : entitylist->get_enemy_heroes()) {
 			qPredictionList[enemy->get_handle()] = q->get_prediction(enemy);
+			smallQPredictionList[enemy->get_handle()] = smallQ->get_prediction(enemy);
 			rPredictionList[enemy->get_handle()] = r->get_prediction(enemy);
 			// man thank you yorik
 			const buffList listOfNeededBuffs = combinedBuffChecks(enemy);
@@ -860,7 +863,10 @@ namespace nami {
 				auto target = target_selector->get_target(q, damage_type::magical);
 				if (target && qPredictionList.find(target->get_handle())!=qPredictionList.end() && (!qMenu::notIfDashReady->get_bool() ||dashReadyIn(target)>q->delay)) {
 					auto& pred = qPredictionList[target->get_handle()];
-					if (pred.hitchance >= get_hitchance(qMenu::hc->get_int())) {
+					auto& pred2 = smallQPredictionList[target->get_handle()];
+					// Now i only Q if i know i would even hit the smaller q, but i use the cast pos of the bigger q
+					// not sure if i should check both hitchances or just the smaller one
+					if (pred.hitchance >= get_hitchance(qMenu::hc->get_int()) && (pred2.hitchance >= get_hitchance(qMenu::hc->get_int()) || !qMenu::toggleRadius->get_bool())) {
 						q->cast(pred.get_cast_position());
 						return;
 					}
@@ -1369,234 +1375,238 @@ namespace nami {
 
 	void load() {
 		q = plugin_sdk->register_spell(spellslot::q, 850);
+		smallQ = plugin_sdk->register_spell(spellslot::q, 850);
 		w = plugin_sdk->register_spell(spellslot::w, 725);
 		e = plugin_sdk->register_spell(spellslot::e, 800);
 		r = plugin_sdk->register_spell(spellslot::r, 1500);
-		// TODO: Check if Q Spelldata is correct
-		q->set_skillshot(0.99, 200, FLT_MAX, { collisionable_objects::yasuo_wall }, skillshot_type::skillshot_circle);
+		// TODO: Check whether to use 0.99 or 1 as delay?
+		q->set_skillshot(1, 200, FLT_MAX, { collisionable_objects::yasuo_wall }, skillshot_type::skillshot_circle);
+		smallQ->set_skillshot(1, 100, FLT_MAX, { collisionable_objects::yasuo_wall }, skillshot_type::skillshot_circle);
 		r->set_skillshot(0.5, 250, 850, { collisionable_objects::yasuo_wall }, skillshot_type::skillshot_line);
 		initSpellDB();
 		// Menu
 		mainMenuTab = menu->create_tab("Flofian_Nami", "Flofian Nami");
 		mainMenuTab->set_assigned_texture(myhero->get_square_icon_portrait());
-		auto generalMenu = mainMenuTab->add_tab("general", "General Settings");
 		{
-			generalMenu::debug = generalMenu->add_checkbox("debug", "Debug Prints", false);
-		}
-		auto qMenu = mainMenuTab->add_tab("q", "Q Settings");
-		{
-			qMenu->set_assigned_texture(myhero->get_spell(spellslot::q)->get_icon_texture());
-			qMenu::hc = qMenu->add_combobox("Hitchance", "Hitchance", { {"Medium", nullptr},{"High", nullptr},{"Very High", nullptr} }, 2);
-			qMenu::mode = qMenu->add_combobox("mode", "Q Mode", { {"Combo + Harass", nullptr},{"Combo", nullptr}, {"Off", nullptr} }, 0);
-			qMenu::notIfDashReady = qMenu->add_checkbox("notIfDashReady", "Try to not Q if Enemy has Dash", false);
-			qMenu->add_separator("sep1", "Auto Q");
-			qMenu::onCC = qMenu->add_checkbox("oncc", "On CC", true);
-			qMenu::onParticle = qMenu->add_checkbox("onParticle", "On Teleport-like Spells", true);
-			qMenu::onParticle->set_tooltip("Teleport, TwistedFate R, TahmKench W, etc");
-			qMenu::onSpecialSpells = qMenu->add_checkbox("onSpecialSpells", "On Special Spells", true);
-			qMenu::onSpecialSpells->set_tooltip("Fiora W, Long cast times");
-			qMenu::onStasis = qMenu->add_checkbox("onStasis", "On Stasis", true);
-			qMenu::onDashes = qMenu->add_combobox("onDashes", "On Dashes", { {"Off", nullptr},{"Prediction", nullptr}, {"Always", nullptr} }, 1);
-			qMenu::dashWhitelist = qMenu->add_tab("dashWhitelist", "Whitelist for Dashes");
-			for (const auto& enemy : entitylist->get_enemy_heroes()) {
-				uint32_t id = enemy->get_network_id();
-				bool defaultVal = true;
-				if (enemy->get_champion() == champion_id::Yasuo || enemy->get_champion() == champion_id::Nilah || enemy->get_champion() == champion_id::Samira || enemy->get_champion() == champion_id::Akali || enemy->get_champion() == champion_id::Kalista) defaultVal = false;
-				qDashWhitelist[id] = qMenu::dashWhitelist->add_checkbox(std::to_string(id), Database::getDisplayName(enemy), defaultVal, false);
-				qDashWhitelist[id]->set_texture(enemy->get_square_icon_portrait());
+			auto generalMenu = mainMenuTab->add_tab("general", "General Settings");
+			{
+				generalMenu::debug = generalMenu->add_checkbox("debug", "Debug Prints", false);
 			}
-			qMenu->add_separator("sep2", "");
-			qMenu::range = qMenu->add_slider("range", "Range", 850, 750, 850);
-			qMenu::range->add_property_change_callback([](TreeEntry* entry) {
-				q->set_range(entry->get_int());
-				});
-			q->set_range(qMenu::range->get_int());
-			qMenu::toggleRadius = qMenu->add_hotkey("toggleCenter", "Try to hit Center", TreeHotkeyMode::Toggle, 0x49, true);
-			qMenu::toggleRadius->add_property_change_callback([](TreeEntry* entry) {
-				q->set_radius(200 -100 * entry->get_bool());
-				});
-			q->set_radius(200 - 100 * qMenu::toggleRadius->get_bool());
-		}
-		auto wMenu = mainMenuTab->add_tab("w", "W Settings");
-		{
-			wMenu->set_assigned_texture(myhero->get_spell(spellslot::w)->get_icon_texture());
-			wMenu::minHealRatio = wMenu->add_slider("minHealRatio", "Min heal Percent for bounces", 75, 0, 150);
-			wMenu::minHealRatio->set_tooltip("Only Counts bounces to allies if you heal them\n"
-											"If at 100, only count if missingHealth > wHeal\n"
-											"If at 50, only count if you waste half your heal at max");
-			wMenu::mode = wMenu->add_combobox("mode", "W Mode", { {"Combo + Harass", nullptr},{"Combo", nullptr}, {"Off", nullptr} }, 0);
-			wMenu::minTargets = wMenu->add_slider("minTargets", "Min Targets", 2, 1, 3);
-			wMenu::autoWTripleHit = wMenu->add_checkbox("autoTripleHit", "Auto W when 3 bounces", true);
-			wMenu::useOnLowHP = wMenu->add_tab("useOnLowHP", "Auto W Allies under x% HP");
-			wMenu::useOnLowHP->add_separator("sep1", "0 to disable");
-			for (const auto& ally : entitylist->get_ally_heroes()) {
-				uint32_t id = ally->get_network_id();
-				wLowHPList[id] = wMenu::useOnLowHP->add_slider(std::to_string(id), Database::getDisplayName(ally), 50 - 25*(myhero->get_handle() == ally->get_handle()), 0, 100, false);
-				wLowHPList[id]->set_texture(ally->get_square_icon_portrait());
+			auto qMenu = mainMenuTab->add_tab("q", "Q Settings");
+			{
+				qMenu->set_assigned_texture(myhero->get_spell(spellslot::q)->get_icon_texture());
+				qMenu::hc = qMenu->add_combobox("Hitchance", "Hitchance", { {"Medium", nullptr},{"High", nullptr},{"Very High", nullptr} }, 2);
+				qMenu::mode = qMenu->add_combobox("mode", "Q Mode", { {"Combo + Harass", nullptr},{"Combo", nullptr}, {"Off", nullptr} }, 0);
+				qMenu::notIfDashReady = qMenu->add_checkbox("notIfDashReady", "Try to not Q if Enemy has Dash", false);
+				qMenu->add_separator("sep1", "Auto Q");
+				qMenu::onCC = qMenu->add_checkbox("oncc", "On CC", true);
+				qMenu::onParticle = qMenu->add_checkbox("onParticle", "On Teleport-like Spells", true);
+				qMenu::onParticle->set_tooltip("Teleport, TwistedFate R, TahmKench W, etc");
+				qMenu::onSpecialSpells = qMenu->add_checkbox("onSpecialSpells", "On Special Spells", true);
+				qMenu::onSpecialSpells->set_tooltip("Fiora W, Long cast times");
+				qMenu::onStasis = qMenu->add_checkbox("onStasis", "On Stasis", true);
+				qMenu::onDashes = qMenu->add_combobox("onDashes", "On Dashes", { {"Off", nullptr},{"Prediction", nullptr}, {"Always", nullptr} }, 1);
+				qMenu::dashWhitelist = qMenu->add_tab("dashWhitelist", "Whitelist for Dashes");
+				for (const auto& enemy : entitylist->get_enemy_heroes()) {
+					uint32_t id = enemy->get_network_id();
+					bool defaultVal = true;
+					if (enemy->get_champion() == champion_id::Yasuo || enemy->get_champion() == champion_id::Nilah || enemy->get_champion() == champion_id::Samira || enemy->get_champion() == champion_id::Akali || enemy->get_champion() == champion_id::Kalista) defaultVal = false;
+					qDashWhitelist[id] = qMenu::dashWhitelist->add_checkbox(std::to_string(id), Database::getDisplayName(enemy), defaultVal, false);
+					qDashWhitelist[id]->set_texture(enemy->get_square_icon_portrait());
+				}
+				qMenu->add_separator("sep2", "");
+				qMenu::range = qMenu->add_slider("range", "Range", 850, 750, 850);
+				qMenu::range->add_property_change_callback([](TreeEntry* entry) {
+					q->set_range(entry->get_int());
+					});
+				q->set_range(qMenu::range->get_int());
+				qMenu::toggleRadius = qMenu->add_hotkey("toggleCenter", "Try to hit Center", TreeHotkeyMode::Toggle, 0x49, true);
+				/*qMenu::toggleRadius->add_property_change_callback([](TreeEntry* entry) {
+					q->set_radius(200 -100 * entry->get_bool());
+					});
+				q->set_radius(200 - 100 * qMenu::toggleRadius->get_bool());*/
 			}
-			wMenu::wMana = wMenu->add_slider("wMana", "Min % Mana to auto W", 50, 0, 100);
+			auto wMenu = mainMenuTab->add_tab("w", "W Settings");
+			{
+				wMenu->set_assigned_texture(myhero->get_spell(spellslot::w)->get_icon_texture());
+				wMenu::minHealRatio = wMenu->add_slider("minHealRatio", "Min heal Percent for bounces", 75, 0, 150);
+				wMenu::minHealRatio->set_tooltip("Only Counts bounces to allies if you heal them\n"
+					"If at 100, only count if missingHealth > wHeal\n"
+					"If at 50, only count if you waste half your heal at max");
+				wMenu::mode = wMenu->add_combobox("mode", "W Mode", { {"Combo + Harass", nullptr},{"Combo", nullptr}, {"Off", nullptr} }, 0);
+				wMenu::minTargets = wMenu->add_slider("minTargets", "Min Targets", 2, 1, 3);
+				wMenu::autoWTripleHit = wMenu->add_checkbox("autoTripleHit", "Auto W when 3 bounces", true);
+				wMenu::useOnLowHP = wMenu->add_tab("useOnLowHP", "Auto W Allies under x% HP");
+				wMenu::useOnLowHP->add_separator("sep1", "0 to disable");
+				for (const auto& ally : entitylist->get_ally_heroes()) {
+					uint32_t id = ally->get_network_id();
+					wLowHPList[id] = wMenu::useOnLowHP->add_slider(std::to_string(id), Database::getDisplayName(ally), 50 - 25 * (myhero->get_handle() == ally->get_handle()), 0, 100, false);
+					wLowHPList[id]->set_texture(ally->get_square_icon_portrait());
+				}
+				wMenu::wMana = wMenu->add_slider("wMana", "Min % Mana to auto W", 50, 0, 100);
 
-		}
-		auto eMenu = mainMenuTab->add_tab("e", "E Settings");
-		{
-			eMenu->set_assigned_texture(myhero->get_spell(spellslot::e)->get_icon_texture());
-			eMenu::mode = eMenu->add_combobox("mode", "E Mode", { {"Always", nullptr}, {"Combo + Harass", nullptr},{"Combo", nullptr}, {"Off", nullptr} }, 0);
-			eMenu::useOn = eMenu->add_tab("useOn", "Use E on:");
-			for (const auto& ally : entitylist->get_ally_heroes()) {
-				auto name = ally->get_model_cstr();
-				auto tab = eMenu::useOn->add_tab(name, Database::getDisplayName(ally));
-				tab->set_texture(ally->get_square_icon_portrait());
-				auto enable = tab->add_checkbox("enable", "Enable " + Database::getDisplayName(ally), true);
-				tab->add_separator("sep", "Spell Settings");
-				enable->set_texture(ally->get_square_icon_portrait());
-				tab->add_checkbox("AA", "Auto Attack", true);
-				// If i get my sdk access removed for this i deserved it
-				auto qDropdown = supportedSpells.find(name + std::string("Q")) != supportedSpells.end();
-				auto wDropdown = supportedSpells.find(name + std::string("W")) != supportedSpells.end();
-				auto eDropdown = supportedSpells.find(name + std::string("E")) != supportedSpells.end();
-				auto rDropdown = supportedSpells.find(name + std::string("R")) != supportedSpells.end();
-				TreeEntry* qt;
-				TreeEntry* wt;
-				TreeEntry* et;
-				TreeEntry* rt;
-				if (qDropdown)
-				{
-					qt = tab->add_combobox("Q", "Q Mode", { {"Off", nullptr}, {"When Hitting", nullptr},{"Always", nullptr} }, 1);
-				}
-				else
-				{
-					qt = tab->add_checkbox("Q", "Q", ally->get_spell(spellslot::q)->get_spell_data()->get_targeting_type() == spell_targeting::target);
-				}
-				if (wDropdown)
-				{
-					wt = tab->add_combobox("W", "W Mode", { {"Off", nullptr}, {"When Hitting", nullptr},{"Always", nullptr} }, 1);
-				}
-				else
-				{
-					wt = tab->add_checkbox("W", "W", ally->get_spell(spellslot::w)->get_spell_data()->get_targeting_type() == spell_targeting::target);
-				}
-				if (eDropdown)
-				{
-					et = tab->add_combobox("E", "E Mode", { {"Off", nullptr}, {"When Hitting", nullptr},{"Always", nullptr} }, 1);
-				}
-				else
-				{
-					et = tab->add_checkbox("E", "E", ally->get_spell(spellslot::e)->get_spell_data()->get_targeting_type() == spell_targeting::target);
-				}
-				if (rDropdown)
-				{
-					rt = tab->add_combobox("R", "R Mode", { {"Off", nullptr}, {"When Hitting", nullptr},{"Always", nullptr} }, 1);
-				}
-				else
-				{
-					rt = tab->add_checkbox("R", "R", ally->get_spell(spellslot::r)->get_spell_data()->get_targeting_type() == spell_targeting::target);
-				}
-				qt->set_texture(ally->get_spell(spellslot::q)->get_icon_texture());
-				wt->set_texture(ally->get_spell(spellslot::w)->get_icon_texture());
-				et->set_texture(ally->get_spell(spellslot::e)->get_icon_texture());
-				rt->set_texture(ally->get_spell(spellslot::r)->get_icon_texture());
-				eDB[name] = tab;
-				// Custom Tooltips:
-				switch (ally->get_champion()) {
-				case champion_id::Karthus:
-					qt->set_tooltip("Delay might be wrong");
-					break;
-				case champion_id::Yasuo:
-				case champion_id::Yone:
-					qt->set_tooltip("\"When Hitting\" Mode only checks Q3");
-					break;
-				case champion_id::Swain:
-					wt->set_tooltip("Delay might be wrong");
-					break;
-				case champion_id::Ryze: 
-					qt->set_tooltip("Only works for direct hits");
-					break;
-				case champion_id::Veigar:
-					qt->set_tooltip("Checks only 1 collision");
-					break;
-				default:
-					break;
-				}
 			}
-			eMenu::overwrite = eMenu->add_combobox("overwrite", "Overwrite", { {"None", nullptr}, {"Only Targeted", nullptr},{"Only Auto Attacks", nullptr}, {"All Targeted", nullptr},{"All Auto Attacks", nullptr} }, 0);
-			eMenu::overwrite->set_tooltip("Only Auto Attacks / Only Targeted still take the list into account\n"
-											"All Auto Attacks / All Targeted ignores the spell settings\n"
-											"You still need to enable / disable the champs");
-			eMenu::remainingTime = eMenu->add_slider("remainingTime", "Min Remaing Time for Skillshots", 100, 10, 1000);
-			eMenu::remainingTime->add_property_change_callback([](TreeEntry* entry) {
-				MinERemainingTime = entry->get_int()/1000.f;
-				});
-		}
-		auto rMenu = mainMenuTab->add_tab("r", "R Settings");
-		{
-			rMenu->set_assigned_texture(myhero->get_spell(spellslot::r)->get_icon_texture()); 
-			rMenu::range = rMenu->add_slider("range", "Range", 1500, 1000, 2750);
-			rMenu::range->add_property_change_callback([](TreeEntry* entry) {
-				r->set_range(entry->get_int());
-				});
-			r->set_range(rMenu::range->get_int());// when loading
-			rMenu::hc = rMenu->add_combobox("Hitchance", "Hitchance", { {"Medium", nullptr},{"High", nullptr},{"Very High", nullptr} }, 2);
-			rMenu::comboTargets = rMenu->add_slider("comboTargets", "Min Targets in Combo (0 to disable)", 3, 0, 5);
-			rMenu::semiKey = rMenu->add_hotkey("semiKey", "Semi Key", TreeHotkeyMode::Hold, 5, true);
-			rMenu::semiTargets = rMenu->add_slider("semiTargets", "Min Targets for Semi R (0 to disable)", 2, 0, 5);
-			rMenu::semiSelected = rMenu->add_checkbox("semiSelected", "Force Semi R on selected", true);
-			rMenu::semiSelected->set_tooltip("If you click on someone to force that target (red circle under them), ignore how many it can hit");
-			rMenu::flee = rMenu->add_slider("flee", "Use R to flee if under x% HP", 30, 0, 100);
-		}
-		auto drawMenu = mainMenuTab->add_tab("drawings", "Drawings Settings");
-		{
-			drawMenu::drawOnlyReady = drawMenu->add_checkbox("drawReady", "Draw Only Ready", true);
-			drawMenu::drawRangeQ = drawMenu->add_checkbox("drawQ", "Draw Q range", true);
-			drawMenu::drawRangeW = drawMenu->add_checkbox("drawW", "Draw W range", true);
-			drawMenu::drawRangeE = drawMenu->add_checkbox("drawE", "Draw E range", true);
-			drawMenu::drawRangeR = drawMenu->add_checkbox("drawR", "Draw R range", true);
+			auto eMenu = mainMenuTab->add_tab("e", "E Settings");
+			{
+				eMenu->set_assigned_texture(myhero->get_spell(spellslot::e)->get_icon_texture());
+				eMenu::mode = eMenu->add_combobox("mode", "E Mode", { {"Always", nullptr}, {"Combo + Harass", nullptr},{"Combo", nullptr}, {"Off", nullptr} }, 0);
+				eMenu::useOn = eMenu->add_tab("useOn", "Use E on:");
+				for (const auto& ally : entitylist->get_ally_heroes()) {
+					auto name = ally->get_model_cstr();
+					auto tab = eMenu::useOn->add_tab(name, Database::getDisplayName(ally));
+					tab->set_texture(ally->get_square_icon_portrait());
+					auto enable = tab->add_checkbox("enable", "Enable " + Database::getDisplayName(ally), true);
+					tab->add_separator("sep", "Spell Settings");
+					enable->set_texture(ally->get_square_icon_portrait());
+					tab->add_checkbox("AA", "Auto Attack", true);
+					// If i get my sdk access removed for this i deserved it
+					auto qDropdown = supportedSpells.find(name + std::string("Q")) != supportedSpells.end();
+					auto wDropdown = supportedSpells.find(name + std::string("W")) != supportedSpells.end();
+					auto eDropdown = supportedSpells.find(name + std::string("E")) != supportedSpells.end();
+					auto rDropdown = supportedSpells.find(name + std::string("R")) != supportedSpells.end();
+					TreeEntry* qt;
+					TreeEntry* wt;
+					TreeEntry* et;
+					TreeEntry* rt;
+					if (qDropdown)
+					{
+						qt = tab->add_combobox("Q", "Q Mode", { {"Off", nullptr}, {"When Hitting", nullptr},{"Always", nullptr} }, 1);
+					}
+					else
+					{
+						qt = tab->add_checkbox("Q", "Q", ally->get_spell(spellslot::q)->get_spell_data()->get_targeting_type() == spell_targeting::target);
+					}
+					if (wDropdown)
+					{
+						wt = tab->add_combobox("W", "W Mode", { {"Off", nullptr}, {"When Hitting", nullptr},{"Always", nullptr} }, 1);
+					}
+					else
+					{
+						wt = tab->add_checkbox("W", "W", ally->get_spell(spellslot::w)->get_spell_data()->get_targeting_type() == spell_targeting::target);
+					}
+					if (eDropdown)
+					{
+						et = tab->add_combobox("E", "E Mode", { {"Off", nullptr}, {"When Hitting", nullptr},{"Always", nullptr} }, 1);
+					}
+					else
+					{
+						et = tab->add_checkbox("E", "E", ally->get_spell(spellslot::e)->get_spell_data()->get_targeting_type() == spell_targeting::target);
+					}
+					if (rDropdown)
+					{
+						rt = tab->add_combobox("R", "R Mode", { {"Off", nullptr}, {"When Hitting", nullptr},{"Always", nullptr} }, 1);
+					}
+					else
+					{
+						rt = tab->add_checkbox("R", "R", ally->get_spell(spellslot::r)->get_spell_data()->get_targeting_type() == spell_targeting::target);
+					}
+					qt->set_texture(ally->get_spell(spellslot::q)->get_icon_texture());
+					wt->set_texture(ally->get_spell(spellslot::w)->get_icon_texture());
+					et->set_texture(ally->get_spell(spellslot::e)->get_icon_texture());
+					rt->set_texture(ally->get_spell(spellslot::r)->get_icon_texture());
+					eDB[name] = tab;
+					// Custom Tooltips:
+					switch (ally->get_champion()) {
+					case champion_id::Karthus:
+						qt->set_tooltip("Delay might be wrong");
+						break;
+					case champion_id::Yasuo:
+					case champion_id::Yone:
+						qt->set_tooltip("\"When Hitting\" Mode only checks Q3");
+						break;
+					case champion_id::Swain:
+						wt->set_tooltip("Delay might be wrong");
+						break;
+					case champion_id::Ryze:
+						qt->set_tooltip("Only works for direct hits");
+						break;
+					case champion_id::Veigar:
+						qt->set_tooltip("Checks only 1 collision");
+						break;
+					default:
+						break;
+					}
+				}
+				eMenu::overwrite = eMenu->add_combobox("overwrite", "Overwrite", { {"None", nullptr}, {"Only Targeted", nullptr},{"Only Auto Attacks", nullptr}, {"All Targeted", nullptr},{"All Auto Attacks", nullptr} }, 0);
+				eMenu::overwrite->set_tooltip("Only Auto Attacks / Only Targeted still take the list into account\n"
+					"All Auto Attacks / All Targeted ignores the spell settings\n"
+					"You still need to enable / disable the champs");
+				eMenu::remainingTime = eMenu->add_slider("remainingTime", "Min Remaing Time for Skillshots", 100, 10, 1000);
+				eMenu::remainingTime->add_property_change_callback([](TreeEntry* entry) {
+					MinERemainingTime = entry->get_int() / 1000.f;
+					});
+			}
+			auto rMenu = mainMenuTab->add_tab("r", "R Settings");
+			{
+				rMenu->set_assigned_texture(myhero->get_spell(spellslot::r)->get_icon_texture());
+				rMenu::range = rMenu->add_slider("range", "Range", 1500, 1000, 2750);
+				rMenu::range->add_property_change_callback([](TreeEntry* entry) {
+					r->set_range(entry->get_int());
+					});
+				r->set_range(rMenu::range->get_int());// when loading
+				rMenu::hc = rMenu->add_combobox("Hitchance", "Hitchance", { {"Medium", nullptr},{"High", nullptr},{"Very High", nullptr} }, 2);
+				rMenu::comboTargets = rMenu->add_slider("comboTargets", "Min Targets in Combo (0 to disable)", 3, 0, 5);
+				rMenu::semiKey = rMenu->add_hotkey("semiKey", "Semi Key", TreeHotkeyMode::Hold, 5, true);
+				rMenu::semiTargets = rMenu->add_slider("semiTargets", "Min Targets for Semi R (0 to disable)", 2, 0, 5);
+				rMenu::semiSelected = rMenu->add_checkbox("semiSelected", "Force Semi R on selected", true);
+				rMenu::semiSelected->set_tooltip("If you click on someone to force that target (red circle under them), ignore how many it can hit");
+				rMenu::flee = rMenu->add_slider("flee", "Use R to flee if under x% HP", 30, 0, 100);
+			}
+			auto drawMenu = mainMenuTab->add_tab("drawings", "Drawings Settings");
+			{
+				drawMenu::drawOnlyReady = drawMenu->add_checkbox("drawReady", "Draw Only Ready", true);
+				drawMenu::drawRangeQ = drawMenu->add_checkbox("drawQ", "Draw Q range", true);
+				drawMenu::drawRangeW = drawMenu->add_checkbox("drawW", "Draw W range", true);
+				drawMenu::drawRangeE = drawMenu->add_checkbox("drawE", "Draw E range", true);
+				drawMenu::drawRangeR = drawMenu->add_checkbox("drawR", "Draw R range", true);
 
 
-			drawMenu::drawRangeQ->set_texture(myhero->get_spell(spellslot::q)->get_icon_texture());
-			drawMenu::drawRangeW->set_texture(myhero->get_spell(spellslot::w)->get_icon_texture());
-			drawMenu::drawRangeE->set_texture(myhero->get_spell(spellslot::e)->get_icon_texture());
-			drawMenu::drawRangeR->set_texture(myhero->get_spell(spellslot::r)->get_icon_texture());
+				drawMenu::drawRangeQ->set_texture(myhero->get_spell(spellslot::q)->get_icon_texture());
+				drawMenu::drawRangeW->set_texture(myhero->get_spell(spellslot::w)->get_icon_texture());
+				drawMenu::drawRangeE->set_texture(myhero->get_spell(spellslot::e)->get_icon_texture());
+				drawMenu::drawRangeR->set_texture(myhero->get_spell(spellslot::r)->get_icon_texture());
 
-			drawMenu->add_separator("sep1", "Debug Settings");
-			drawMenu::drawWTargets = drawMenu->add_checkbox("drawWTargets", "Draw W Hitcount", false);
-			drawMenu::drawESpells = drawMenu->add_checkbox("drawESpells", "Draw Spells for E", false);
-			drawMenu::drawWTargets->set_texture(myhero->get_spell(spellslot::w)->get_icon_texture());
-			drawMenu::drawESpells->set_texture(myhero->get_spell(spellslot::e)->get_icon_texture());
+				drawMenu->add_separator("sep1", "Debug Settings");
+				drawMenu::drawWTargets = drawMenu->add_checkbox("drawWTargets", "Draw W Hitcount", false);
+				drawMenu::drawESpells = drawMenu->add_checkbox("drawESpells", "Draw Spells for E", false);
+				drawMenu::drawWTargets->set_texture(myhero->get_spell(spellslot::w)->get_icon_texture());
+				drawMenu::drawESpells->set_texture(myhero->get_spell(spellslot::e)->get_icon_texture());
 
-			drawMenu->add_separator("sep2", "");
-			drawMenu::lineThickness = drawMenu->add_slider("lineThickness", "Line Thickness", 10, 10, 50);
-			drawMenu::glowInsideSize = drawMenu->add_slider("glowInsideSize", "Glow Inside Size", 5, 0, 100);
-			drawMenu::glowInsidePow = drawMenu->add_slider("glowInsidePow", "Glow Inside Power", 90, 0, 100);
-			drawMenu::glowOutsideSize = drawMenu->add_slider("glowOutsideSize", "Glow Outside Size", 10, 0, 100);
-			drawMenu::glowOutsidePow = drawMenu->add_slider("glowOutsidePow", "Glow Outside Power", 90, 0, 100);
-			drawMenu::useGrad = drawMenu->add_checkbox("useGrad", "Use Gradient", false);
-			float gradcolor[] = { 0.f, 0.f, 1.f, 1.f };
-			drawMenu::gradColor = drawMenu->add_colorpick("gradColor", "Gradient Color", gradcolor);
-			drawMenu::useGrad->add_property_change_callback([](TreeEntry* entry) {
-				drawMenu::gradColor->is_hidden() = !entry->get_bool();
-				});
-			drawMenu::gradColor->is_hidden() = !drawMenu::useGrad->get_bool();
+				drawMenu->add_separator("sep2", "");
+				drawMenu::lineThickness = drawMenu->add_slider("lineThickness", "Line Thickness", 10, 10, 50);
+				drawMenu::glowInsideSize = drawMenu->add_slider("glowInsideSize", "Glow Inside Size", 5, 0, 100);
+				drawMenu::glowInsidePow = drawMenu->add_slider("glowInsidePow", "Glow Inside Power", 90, 0, 100);
+				drawMenu::glowOutsideSize = drawMenu->add_slider("glowOutsideSize", "Glow Outside Size", 10, 0, 100);
+				drawMenu::glowOutsidePow = drawMenu->add_slider("glowOutsidePow", "Glow Outside Power", 90, 0, 100);
+				drawMenu::useGrad = drawMenu->add_checkbox("useGrad", "Use Gradient", false);
+				float gradcolor[] = { 0.f, 0.f, 1.f, 1.f };
+				drawMenu::gradColor = drawMenu->add_colorpick("gradColor", "Gradient Color", gradcolor);
+				drawMenu::useGrad->add_property_change_callback([](TreeEntry* entry) {
+					drawMenu::gradColor->is_hidden() = !entry->get_bool();
+					});
+				drawMenu::gradColor->is_hidden() = !drawMenu::useGrad->get_bool();
 
-			drawMenu->add_separator("sep3", "");
-			auto colorMenu = drawMenu->add_tab("color", "Color Settings");
+				drawMenu->add_separator("sep3", "");
+				auto colorMenu = drawMenu->add_tab("color", "Color Settings");
 
-			float qcolor[] = { 0.f, 0.f, 1.f, 1.f };
-			colorMenu::qColor = colorMenu->add_colorpick("colorQ", "Q Range Color", qcolor);
-			float wcolor[] = { 0.f, 1.f, 0.f, 1.f };
-			colorMenu::wColor = colorMenu->add_colorpick("colorW", "W Range Color", wcolor);
-			float ecolor[] = { 1.f, 0.f, 1.f, 1.f };
-			colorMenu::eColor = colorMenu->add_colorpick("colorE", "E Range Color", ecolor);
-			float rcolor[] = { 1.f, 1.f, 0.f, 1.f };
-			colorMenu::rColor = colorMenu->add_colorpick("colorR", "R Range Color", rcolor);
-		}
-		auto interruptMenu = mainMenuTab->add_tab("interrupt", "Interrupt Settings");
-		{
-			interruptMenu::useQ = interruptMenu->add_checkbox("useQ", "Use Q for Importance >= 1", true);
-			interruptMenu::useQ->set_texture(myhero->get_spell(spellslot::q)->get_icon_texture());
-			interruptMenu::useR = interruptMenu->add_checkbox("useR", "Use R for Importance >= 3", true);
-			interruptMenu::useR->set_texture(myhero->get_spell(spellslot::r)->get_icon_texture());
-			interruptMenu::spelldb = interruptMenu->add_tab("interruptdb", "Importance Settings");
-			Database::InitializeCancelMenu(interruptMenu::spelldb);
+				float qcolor[] = { 0.f, 0.f, 1.f, 1.f };
+				colorMenu::qColor = colorMenu->add_colorpick("colorQ", "Q Range Color", qcolor);
+				float wcolor[] = { 0.f, 1.f, 0.f, 1.f };
+				colorMenu::wColor = colorMenu->add_colorpick("colorW", "W Range Color", wcolor);
+				float ecolor[] = { 1.f, 0.f, 1.f, 1.f };
+				colorMenu::eColor = colorMenu->add_colorpick("colorE", "E Range Color", ecolor);
+				float rcolor[] = { 1.f, 1.f, 0.f, 1.f };
+				colorMenu::rColor = colorMenu->add_colorpick("colorR", "R Range Color", rcolor);
+			}
+			auto interruptMenu = mainMenuTab->add_tab("interrupt", "Interrupt Settings");
+			{
+				interruptMenu::useQ = interruptMenu->add_checkbox("useQ", "Use Q for Importance >= 1", true);
+				interruptMenu::useQ->set_texture(myhero->get_spell(spellslot::q)->get_icon_texture());
+				interruptMenu::useR = interruptMenu->add_checkbox("useR", "Use R for Importance >= 3", true);
+				interruptMenu::useR->set_texture(myhero->get_spell(spellslot::r)->get_icon_texture());
+				interruptMenu::spelldb = interruptMenu->add_tab("interruptdb", "Importance Settings");
+				Database::InitializeCancelMenu(interruptMenu::spelldb);
+			}
 		}
 
 		event_handler<events::on_draw>::add_callback(on_draw);
