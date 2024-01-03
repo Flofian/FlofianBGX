@@ -197,6 +197,8 @@ namespace nami {
 		TreeEntry* hc;
 		TreeEntry* mode;
 		TreeEntry* notIfDashReady;
+		TreeEntry* onlySlowed;
+		TreeEntry* onlySlowedMS;
 		TreeEntry* onCC;
 		TreeEntry* onParticle;
 		TreeEntry* onSpecialSpells;
@@ -863,7 +865,8 @@ namespace nami {
 			bool modeCast = (qMenu::mode->get_int() == 0 && orbwalker->harass()) || (qMenu::mode->get_int() <= 1 && orbwalker->combo_mode());
 			if (modeCast) {
 				auto target = target_selector->get_target(q, damage_type::magical);
-				if (target && qPredictionList.find(target->get_handle())!=qPredictionList.end() && (!qMenu::notIfDashReady->get_bool() ||dashReadyIn(target)>q->delay)) {
+				if (target && qPredictionList.find(target->get_handle())!=qPredictionList.end() && (!qMenu::notIfDashReady->get_bool() ||dashReadyIn(target)>q->delay)
+					&& (qMenu::onlySlowed->get_int() !=1 || target->has_buff_type(buff_type::Slow)) && (qMenu::onlySlowed->get_int() != 2 || target->get_move_speed() < qMenu::onlySlowedMS->get_int())) {
 					auto& pred = qPredictionList[target->get_handle()];
 					auto& pred2 = smallQPredictionList[target->get_handle()];
 					// Now i only Q if i know i would even hit the smaller q, but i use the cast pos of the bigger q
@@ -916,7 +919,7 @@ namespace nami {
 				// Dashes
 				if (qMenu::onDashes->get_int()!=0 && qDashWhitelist.find(target->get_network_id())!=qDashWhitelist.end() && qDashWhitelist.find(target->get_network_id())->second->get_bool()) {
 					//if (generalMenu::debug->get_bool()) console->print("%s is dashing: %i", target->get_model_cstr(), target->is_dashing());
-					if ((qMenu::onDashes->get_int() == 2 && target->is_dashing()) || (pred.hitchance == hit_chance::dashing && qMenu::onDashes->get_int() == 1)) {
+					if (((qMenu::onDashes->get_int() == 2 && target->is_dashing()) || (pred.hitchance == hit_chance::dashing && qMenu::onDashes->get_int() == 1)) && (!qMenu::notIfDashReady->get_bool() || dashReadyIn(target) > q->delay)) {
 						q->cast(pred.get_cast_position());
 						console->print("Cast Q on Dash %s", target->get_model_cstr());
 						return;
@@ -1408,7 +1411,13 @@ namespace nami {
 				qMenu->set_assigned_texture(myhero->get_spell(spellslot::q)->get_icon_texture());
 				qMenu::hc = qMenu->add_combobox("Hitchance", "Hitchance", { {"Medium", nullptr},{"High", nullptr},{"Very High", nullptr} }, 2);
 				qMenu::mode = qMenu->add_combobox("mode", "Q Mode", { {"Combo + Harass", nullptr},{"Combo", nullptr}, {"Off", nullptr} }, 0);
-				qMenu::notIfDashReady = qMenu->add_checkbox("notIfDashReady", "Try to not Q if Enemy has Dash", false);
+				qMenu::notIfDashReady = qMenu->add_checkbox("notIfDashReady", "^ Try to not Q if Enemy has Dash", false);
+				qMenu::onlySlowed = qMenu->add_combobox("onlySlowed", "^ Only if Slowed", { {"Off", nullptr},{"By Debuff", nullptr}, {"Under x MS", nullptr} }, 1);
+				qMenu::onlySlowedMS = qMenu->add_slider("onlySlowedMS", "  ^ Max MovementSpeed", 300, 200, 350);
+				qMenu::onlySlowed->add_property_change_callback([](TreeEntry* entry) {
+					qMenu::onlySlowedMS->is_hidden() = entry->get_int() != 2;
+					});
+				qMenu::onlySlowedMS->is_hidden() = qMenu::onlySlowed->get_int() != 2;
 				qMenu->add_separator("sep1", "Auto Q");
 				qMenu::onCC = qMenu->add_checkbox("oncc", "On CC", true);
 				qMenu::onParticle = qMenu->add_checkbox("onParticle", "On Teleport-like Spells", true);
