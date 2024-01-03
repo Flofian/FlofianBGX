@@ -204,6 +204,13 @@ void permashow_menu_element_change(TreeEntry* element)
 			it->value = element->get_bool() ? "ON" : "OFF";
 			it->value_color = element->get_bool() ? vector(0, 255, 0) : vector(255, 0, 0);
 			break;
+		// Yeah this is stupid
+		case TreeEntryType::TextInput:
+			it->value = element->get_string();
+			
+			auto c = text_color->get_color();
+			it->value_color = vector(c & 0xff, (c>>8) & 0xff, (c >> 16) & 0xff);
+			break;
 	}
 
 	permashow_update = true;
@@ -312,7 +319,12 @@ void permashow::update()
 		std::stringstream s1 = get_keybind_format(element);
 
 		const auto name_size  = draw_manager->calc_text_size(font_size, "%s", s1.str().c_str());
-		const auto value_size = draw_manager->calc_text_size(font_size, "%s", "OFF");
+		auto value_size = draw_manager->calc_text_size(font_size, "%s", "OFF");
+		if (element.assigned_menu_element && element.assigned_menu_element->element_type() == TreeEntryType::TextInput)
+		{
+			permashow_menu_element_change(element.assigned_menu_element);
+			value_size = draw_manager->calc_text_size(font_size, "%s", element.value.c_str());
+		}
 
 		if (name_size.x > max_name_width) max_name_width = name_size.x;
 		if (value_size.x > max_value_width) max_value_width = value_size.x;

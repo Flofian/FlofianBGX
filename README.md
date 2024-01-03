@@ -26,14 +26,16 @@ Possible Future Champs:
 
 - Bard
 
-- Ryze?
+- Karma
 
 - Leona
 
-- Karma
+- Ryze?
 
-- Zyra
+- Seraphine
 
 - Zilean
+
+- Zyra
 
 (These are just what i might do, nothing is planned/started yet)
