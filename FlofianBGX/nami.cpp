@@ -1190,7 +1190,7 @@ namespace nami {
 
 	void on_process_spell_cast(game_object_script sender, spell_instance_script spell) {
 		if (!sender || !spell) return;
-		if (sender->is_me() && spell->get_spellslot() == spellslot::q) 
+		if (sender->is_me() && spell->get_spellslot() == spellslot::q && myhero->count_enemies_in_range(2000)>0) // not sure how to check if im in shop range? dont want to count q on dummy in arena
 		{
 			qCastCount++;
 			qHitcountMenu->set_string(std::to_string(qHitCount) + " / " + std::to_string(qCastCount));
@@ -1358,7 +1358,7 @@ namespace nami {
 			guardianReviveTime[sender->get_handle()] = deathAnimTime[sender->get_handle()] + 4;
 			return;
 		}
-		if (gain && buff->get_hash_name() == buff_hash("NamiQDebuff") && buff->get_caster()->is_me()) 
+		if (gain && buff->get_hash_name() == buff_hash("NamiQDebuff") && buff->get_caster()->is_me() && sender->is_enemy() && sender->is_ai_hero()) 
 		{
 			qHitCount++;
 			qHitcountMenu->set_string(std::to_string(qHitCount) + " / " + std::to_string(qCastCount));
