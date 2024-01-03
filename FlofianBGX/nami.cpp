@@ -14,6 +14,10 @@ namespace nami {
 	script_spell* r = nullptr;
 	script_spell* smallQ = nullptr;
 
+	TreeEntry* qHitcountMenu = nullptr;
+	int qCastCount = 0;
+	int qHitCount = 0;
+
 	TreeTab* mainMenuTab = nullptr;
 
 	std::map<std::string, TreeTab*> eDB;
@@ -1092,7 +1096,6 @@ namespace nami {
 
 	void on_draw() {
 
-
 		update_spells();
 		if(drawMenu::drawWTargets->get_bool()){
 			for (const auto& ally : entitylist->get_ally_heroes()) {
@@ -1186,6 +1189,14 @@ namespace nami {
 	}
 
 	void on_process_spell_cast(game_object_script sender, spell_instance_script spell) {
+		if (!sender || !spell) return;
+		if (sender->is_me() && spell->get_spellslot() == spellslot::q) 
+		{
+			qCastCount++;
+			qHitcountMenu->set_string(std::to_string(qHitCount) + " / " + std::to_string(qCastCount));
+			permashow::instance.update();
+		}
+
 		if (sender->is_ai_hero() && sender->is_ally())
 		{
 			//console->print(spell->get_spell_data()->get_name_cstr());
@@ -1346,6 +1357,12 @@ namespace nami {
 			if (generalMenu::debug->get_bool()) console->print("%s will ga revive", sender->get_model_cstr());
 			guardianReviveTime[sender->get_handle()] = deathAnimTime[sender->get_handle()] + 4;
 			return;
+		}
+		if (gain && buff->get_hash_name() == buff_hash("NamiQDebuff") && buff->get_caster()->is_me()) 
+		{
+			qHitCount++;
+			qHitcountMenu->set_string(std::to_string(qHitCount) + " / " + std::to_string(qCastCount));
+			permashow::instance.update();
 		}
 	}
 	void on_buff_gain(game_object_script sender, buff_instance_script buff)
@@ -1633,6 +1650,9 @@ namespace nami {
 		permashow::instance.add_element("Semi R", rMenu::semiKey);
 
 		mainMenuTab->add_separator("version", VERSION);
+		qHitcountMenu = mainMenuTab->add_text_input("qHitcount", "qHitcountDebug", "0 / 0", false);
+		qHitcountMenu->is_hidden() = true;
+		permashow::instance.add_element("Q Hitcount", qHitcountMenu);
 		mainMenuTab->add_separator("sep1", "Special Thanks to yorik100");
 	}
 	void unload() {
