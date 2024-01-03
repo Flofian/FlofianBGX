@@ -305,6 +305,7 @@ namespace nami {
 		"RengarE",
 		"RyzeQ",
 		"SamiraQ",
+		"SeraphineE",
 		"SivirQ",
 		"SkarnerE",
 		"TwistedFateQ",
@@ -430,7 +431,7 @@ namespace nami {
 		linSpellDB[spell_hash("RyzeQ")] = linSpellData(55, 1700, { collisionable_objects::yasuo_wall, collisionable_objects::minions }, spellslot::q);
 		// ^Only direct hit, not for q over e
 		linSpellDB[spell_hash("SamiraQGun")] = linSpellData(60, 2600, { collisionable_objects::yasuo_wall, collisionable_objects::minions }, spellslot::q);
-		// Seraphine E
+		linSpellDB[spell_hash("SeraphineEMissile")] = linSpellData(70, 1200, { collisionable_objects::yasuo_wall }, spellslot::e);
 		linSpellDB[spell_hash("SivirQMissile")] = linSpellData(90, 1450, { collisionable_objects::yasuo_wall }, spellslot::q);
 		linSpellDB[spell_hash("SivirQMissileReturn")] = linSpellData(100, 1200, { collisionable_objects::yasuo_wall }, spellslot::q);
 		linSpellDB[spell_hash("SkarnerFractureMissile")] = linSpellData(70, 1500, { collisionable_objects::yasuo_wall }, spellslot::e);
@@ -597,7 +598,7 @@ namespace nami {
 			auto& nearestEnemy = *std::min_element(enemies.begin(), enemies.end(), [&](game_object_script a, game_object_script b) {
 				return predictedAllyPos.distance(firstBouncePredList[a->get_network_id()]) < predictedAllyPos.distance(firstBouncePredList[b->get_network_id()]);
 				});
-			hitCount += 1 + wKillEnemy(nearestEnemy, 1);
+			hitCount += wKillEnemy(nearestEnemy, 1);
 			// I estimate the time it takes my w to reach the first target, then predict where it and the enemies are
 			// then i take the nearest one
 			// So now i have the target i w to and the target it will bounce to next
@@ -944,7 +945,7 @@ namespace nami {
 			if(autoChecks)
 			{
 				for (const auto& ally : entitylist->get_ally_heroes()) {
-					if (ally->get_distance(myhero) > w->range() || ally->is_dead() || !ally->is_targetable()) continue;
+					if (ally->get_distance(myhero) > w->range() || ally->is_dead() || !ally->is_targetable() || ally->is_recalling()) continue;
 					if (ally->get_health_percent() < wLowHPList[ally->get_network_id()]->get_int()) w->cast(ally);
 				}
 			}
@@ -1059,7 +1060,7 @@ namespace nami {
 						if (target->get_champion() == champion_id::Jhin || target->get_champion() == champion_id::Xerath || target->get_champion() == champion_id::Karthus) r->set_range(2750);
 						// ^ I do this because i want to cancel them far away aswell, really hated it when blahajaio tried to cancel katarina r 3 screens away
 						auto pred = r->get_prediction(target);
-						if(pred.hitchance >= get_hitchance(rMenu::hc->get_int()))
+						if(pred.hitchance >= hit_chance::low)
 						{
 							r->cast(target);
 							if (generalMenu::debug->get_bool()) console->print("Interrupt R on %s", Database::getDisplayName(target).c_str());
@@ -1069,7 +1070,7 @@ namespace nami {
 					if (Database::getCastingImportance(target) >= 1 && qInterrupt)
 					{
 						auto pred = q->get_prediction(target);
-						if (pred.hitchance >= get_hitchance(qMenu::hc->get_int()))
+						if (pred.hitchance >= hit_chance::low)
 						{
 							q->cast(target);
 							if (generalMenu::debug->get_bool()) console->print("Interrupt Q on %s", Database::getDisplayName(target).c_str());
@@ -1211,6 +1212,12 @@ namespace nami {
 				{
 					auto h = obj->get_missile_sdata()->get_name_hash();
 					if (linSpellDB.find(h) != linSpellDB.end()) {
+						auto lit = linSpellDB[h];
+						auto tab = eDB[sender->get_model_cstr()];
+						if (!tab || !tab->get_entry("enable")->get_bool()) return;
+						std::string spellName = spellSlotName(lit.slot);
+						if (spellName == "") return;
+						if (tab->get_entry(spellName)->get_int() != 1) return;
 						missileList.push_back(obj);
 					}
 					//console->print(obj->get_missile_sdata()->get_name_cstr());
