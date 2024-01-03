@@ -192,9 +192,7 @@ namespace nami {
 	std::unordered_map<uint32_t, float> godBuffTime;
 	std::unordered_map<uint32_t, float> noKillBuffTime;
 
-	namespace generalMenu {
-		TreeEntry* debug = nullptr;
-	}
+
 	namespace qMenu {
 		TreeEntry* hc;
 		TreeEntry* mode;
@@ -688,7 +686,7 @@ namespace nami {
 			// Getting the final cast position
 			if (obj.isTeleport)
 			{
-				if (generalMenu::debug->get_bool()) console->print("Found Teleport");
+				console->print("Found Teleport");
 				obj.target = obj.obj->get_particle_attachment_object();
 				if (!obj.target)
 					obj.target = obj.obj->get_particle_target_attachment_object();
@@ -787,7 +785,7 @@ namespace nami {
 		if (stasisTime > 0)
 		{
 			guardianReviveTime[target->get_handle()] = 0.f;
-			if(generalMenu::debug->get_bool()) console->print("Removed GAtime because stasis %s", target->get_model_cstr());
+			console->print("Removed GAtime because stasis %s", target->get_model_cstr());
 		}
 		const auto reviveTime = guardianReviveTime[target->get_handle()];
 		const float GATime = (stasisTime <= 0 && reviveTime ? reviveTime - gametime->get_time() : 0);
@@ -796,7 +794,7 @@ namespace nami {
 			stasisTime = GATime;
 			stasisStart = reviveTime - 4;
 			stasisEnd = reviveTime;
-			if (generalMenu::debug->get_bool()) console->print("Set stasis to revive %s", target->get_model_cstr());
+			console->print("Set stasis to revive %s", target->get_model_cstr());
 		}
 		const stasisStruct& stasisInfo = { .stasisTime = stasisTime, .stasisStart = stasisStart, .stasisEnd = stasisEnd };
 		const buffList& buffStruct = { .godBuff = godBuffTime, .noKillBuff = noKillBuffTime, .stasis = stasisInfo };
@@ -855,7 +853,7 @@ namespace nami {
 			stasisInfo[enemy->get_handle()] = listOfNeededBuffs.stasis;
 			if (!enemy->is_playing_animation(buff_hash("Death")))
 			{
-				if (generalMenu::debug->get_bool() && guardianReviveTime[enemy->get_handle()]>0) console->print("Removed GA Revive from %s", enemy->get_model_cstr());
+				if (guardianReviveTime[enemy->get_handle()]>0) console->print("Removed GA Revive from %s", enemy->get_model_cstr());
 				guardianReviveTime[enemy->get_handle()] = -1;
 			}
 		}
@@ -889,7 +887,7 @@ namespace nami {
 					{
 						if (stasisDuration > 0 && (stasisDuration + 0.2 - ping->get_ping() / 1000.f) < q->delay) {
 							q->cast(pred.get_cast_position());
-							if (generalMenu::debug->get_bool()) console->print("Cast Q on Stasis %s", target->get_model_cstr());
+							console->print("Cast Q on Stasis %s", target->get_model_cstr());
 						}
 					}
 				}
@@ -910,7 +908,7 @@ namespace nami {
 						auto remainingTime = castStartTime - gametime->get_time() + castTime;
 						if (remainingTime > 0.8 && pred.hitchance >= hit_chance::low) {	// should be enough, not sure if there are any other than luxR and ezrealR Also maybe change to hitchance immobile
 							q->cast(pred.get_cast_position());
-							if (generalMenu::debug->get_bool()) console->print("Cast Q on Special %s", target->get_model_cstr());
+							console->print("Cast Q on Special %s", target->get_model_cstr());
 							return;
 						}
 					}
@@ -920,7 +918,7 @@ namespace nami {
 					//if (generalMenu::debug->get_bool()) console->print("%s is dashing: %i", target->get_model_cstr(), target->is_dashing());
 					if ((qMenu::onDashes->get_int() == 2 && target->is_dashing()) || (pred.hitchance == hit_chance::dashing && qMenu::onDashes->get_int() == 1)) {
 						q->cast(pred.get_cast_position());
-						if (generalMenu::debug->get_bool()) console->print("Cast Q on Dash %s", target->get_model_cstr());
+						console->print("Cast Q on Dash %s", target->get_model_cstr());
 						return;
 					}
 				}
@@ -1038,23 +1036,23 @@ namespace nami {
 			auto semiTargets = rMenu::semiTargets->get_int();
 			if (selected && rMenu::semiSelected->get_bool() && rMenu::semiKey->get_bool()) {
 				r->cast(rPredictionList[selected->get_handle()].get_cast_position());
-				if (generalMenu::debug->get_bool()) console->print("Semi R Selected %s", selected->get_model_cstr());
+				console->print("Semi R Selected %s", selected->get_model_cstr());
 				return;
 			}
 			rPos bestR = getBestRPos();
 			if (bestR.enemyHitcount >= comboTargets && orbwalker->combo_mode()) {
 				r->cast(bestR.direction);
-				if (generalMenu::debug->get_bool()) console->print("Combo R %i Enemies", bestR.enemyHitcount);
+				console->print("Combo R %i Enemies", bestR.enemyHitcount);
 				return;
 			}
 			if (bestR.enemyHitcount >= semiTargets && rMenu::semiKey->get_bool()) {
 				r->cast(bestR.direction);
-				if (generalMenu::debug->get_bool()) console->print("Semi R %i Enemies", bestR.enemyHitcount);
+				console->print("Semi R %i Enemies", bestR.enemyHitcount);
 				return;
 			}
 			if (bestR.enemyHitcount > 0 && orbwalker->flee_mode() && myhero->get_health_percent() < rMenu::flee->get_int()) {
 				r->cast(bestR.direction);
-				if (generalMenu::debug->get_bool()) console->print("Flee R %i Enemies", bestR.enemyHitcount);
+				console->print("Flee R %i Enemies", bestR.enemyHitcount);
 				return;
 			}
 		}
@@ -1073,7 +1071,7 @@ namespace nami {
 						if(pred.hitchance >= hit_chance::low)
 						{
 							r->cast(target);
-							if (generalMenu::debug->get_bool()) console->print("Interrupt R on %s", Database::getDisplayName(target).c_str());
+							console->print("Interrupt R on %s", Database::getDisplayName(target).c_str());
 						}
 						r->set_range(rMenu::range->get_int());
 					}
@@ -1083,7 +1081,7 @@ namespace nami {
 						if (pred.hitchance >= hit_chance::low)
 						{
 							q->cast(target);
-							if (generalMenu::debug->get_bool()) console->print("Interrupt Q on %s", Database::getDisplayName(target).c_str());
+							console->print("Interrupt Q on %s", Database::getDisplayName(target).c_str());
 						}
 					}
 
@@ -1309,7 +1307,7 @@ namespace nami {
 
 		if (object_hash == spell_hash("global_ss_teleport_turret_red.troy"))
 		{
-			if (generalMenu::debug->get_bool()) console->print("Found Teleport ");
+			console->print("Found Teleport ");
 			const auto& target = obj->get_particle_attachment_object();
 			if (nexusPos != vector::zero)
 			{
@@ -1320,7 +1318,7 @@ namespace nami {
 		}
 		else if (object_hash == spell_hash("global_ss_teleport_target_red.troy"))
 		{
-			if (generalMenu::debug->get_bool()) console->print("Found Teleport 2");
+			console->print("Found Teleport 2");
 			const auto& target = obj->get_particle_target_attachment_object();
 			if (nexusPos != vector::zero)
 			{
@@ -1354,7 +1352,7 @@ namespace nami {
 		// Detects if someone is reviving from Guardian Angel
 		if (!gain && buff->get_hash_name() == buff_hash("willrevive") && sender->is_playing_animation(buff_hash("Death")) && sender->has_item(ItemId::Guardian_Angel) != spellslot::invalid)
 		{
-			if (generalMenu::debug->get_bool()) console->print("%s will ga revive", sender->get_model_cstr());
+			console->print("%s will ga revive", sender->get_model_cstr());
 			guardianReviveTime[sender->get_handle()] = deathAnimTime[sender->get_handle()] + 4;
 			return;
 		}
@@ -1386,7 +1384,7 @@ namespace nami {
 		if (strcmp(data->animation_name, "Death") == 0)
 		{
 			deathAnimTime[sender->get_handle()] = gametime->get_time();
-			if (generalMenu::debug->get_bool()) console->print("Set DeathAnimTime to %f on %s", gametime->get_time(), sender->get_model_cstr());
+			console->print("Set DeathAnimTime to %f on %s", gametime->get_time(), sender->get_model_cstr());
 		}
 	}
 
@@ -1405,10 +1403,6 @@ namespace nami {
 		mainMenuTab = menu->create_tab("Flofian_Nami", "Flofian Nami");
 		mainMenuTab->set_assigned_texture(myhero->get_square_icon_portrait());
 		{
-			auto generalMenu = mainMenuTab->add_tab("general", "General Settings");
-			{
-				generalMenu::debug = generalMenu->add_checkbox("debug", "Debug Prints", false);
-			}
 			auto qMenu = mainMenuTab->add_tab("q", "Q Settings");
 			{
 				qMenu->set_assigned_texture(myhero->get_spell(spellslot::q)->get_icon_texture());
