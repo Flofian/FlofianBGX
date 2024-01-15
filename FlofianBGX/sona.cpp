@@ -1,6 +1,6 @@
 #include "../plugin_sdk/plugin_sdk.hpp"
 #include "sona.h"
-#include "../spelldb/SpellDB.h"
+#include "../interruptdb/Interrupt.h"
 
 
 namespace sona {
@@ -348,11 +348,13 @@ namespace sona {
 		// R interrupt
 		if (r->is_ready() && (!generalMenu::recallCheck->get_bool() || !myhero->is_recalling()) && rMenu::interrupt->get_bool()) {
 			for (const auto& target : entitylist->get_enemy_heroes()) {
-				if (target && target->is_valid() && target->is_visible() && !target->is_zombie() && target->is_valid_target(rMenu::range->get_int()) && Database::getCastingImportance(target)>=3 && !target->get_is_cc_immune()) {
+				auto interruptData = InterruptDB::getInterruptable(target);
+				if (target && target->is_valid() && target->is_visible() && !target->is_zombie() && target->is_valid_target(rMenu::range->get_int()) && interruptData.dangerLevel && !target->get_is_cc_immune()) {
 					auto pred = r->get_prediction(target, true);
-					if (pred.hitchance >= getHitchance(rMenu::hitchance->get_int())) {
+					float timeToHit = pred.get_unit_position().distance(myhero) / r->speed + r->delay;
+					if (pred.hitchance >= getHitchance(rMenu::hitchance->get_int()) && interruptData.maxRemainingTime>=timeToHit) {
 						r->cast(pred.get_cast_position());
-						if (generalMenu::debugMode->get_bool()) myhero->print_chat(0, "Interrupt R on %i Targets with hitchance %i", pred.aoe_targets_hit_count(), pred.hitchance);
+						if (generalMenu::debugMode->get_bool()) myhero->print_chat(0, "Interrupt R on %s", InterruptDB::getDisplayName(target).c_str());
 					}
 				}
 
@@ -587,7 +589,7 @@ namespace sona {
 				rMenu::ignoreSemiHitcount->set_tooltip("If you click on someone to force that target (red circle under them), ignore how many it can hit");
 				rMenu::interrupt = rMenu->add_checkbox("Interrupt", "Use to Interrupt Spells with Importance >= 3", true);
 				rMenu::spelldb = rMenu->add_tab("interruptdb", "Interrupt Database");
-				Database::InitializeCancelMenu(rMenu::spelldb);
+				InterruptDB::InitializeCancelMenu(rMenu::spelldb, true, 3);
 			}
 			auto drawMenu = mainMenuTab->add_tab("drawings", "Drawings Settings");
 			{
