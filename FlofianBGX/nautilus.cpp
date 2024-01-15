@@ -1,6 +1,6 @@
 #include "../plugin_sdk/plugin_sdk.hpp"
 #include "nautilus.h"
-#include "../spelldb/SpellDB.h"
+#include "../interruptdb/Interrupt.h"
 // TODO: E with prediction, (split into the 3 circles?), multi hit e?
 
 namespace nautilus {
@@ -194,11 +194,13 @@ namespace nautilus {
 		// Q interrupt
 		if (q->is_ready() && qMenu::interrupt->get_bool()) {
 			for (const auto& target : entitylist->get_enemy_heroes()) {
-				if (target && target->is_valid() && target->is_visible() && !target->is_zombie() && target->is_valid_target(q->range()) && Database::getCastingImportance(target)>=2 && !target->get_is_cc_immune()) {
+				auto interruptData = InterruptDB::getInterruptable(target);
+				if (target && target->is_valid() && target->is_visible() && !target->is_zombie() && target->is_valid_target(q->range()) && interruptData.dangerLevel>=2 && !target->get_is_cc_immune()) {
+					auto timeToHit = q->get_prediction(target).get_unit_position().distance(myhero) / q->speed + q->delay;
 					auto castpos = getQCastPos(target);
-					if (castpos != vector()) {
+					if (castpos != vector() && interruptData.maxRemainingTime>=timeToHit) {
 						q->cast(castpos);
-						if (generalMenu::debug->get_bool()) myhero->print_chat(0, "Interrupt Q on %s", Database::getDisplayName(target).c_str());
+						if (generalMenu::debug->get_bool()) myhero->print_chat(0, "Interrupt Q on %s", InterruptDB::getDisplayName(target).c_str());
 					}
 				}
 
@@ -208,9 +210,14 @@ namespace nautilus {
 		// R interrupt
 		if (r->is_ready() && rMenu::interrupt->get_bool()) {
 			for (const auto& target : entitylist->get_enemy_heroes()) {
-				if (target && target->is_valid() && target->is_visible() && !target->is_zombie() && target->is_valid_target(r->range()) && Database::getCastingImportance(target) >= 3 && !target->get_is_cc_immune()) {
-					r->cast(target);
-					if (generalMenu::debug->get_bool()) myhero->print_chat(0, "Interrupt R on %s", Database::getDisplayName(target).c_str());
+				auto interruptData = InterruptDB::getInterruptable(target);
+				if (target && target->is_valid() && target->is_visible() && !target->is_zombie() && target->is_valid_target(r->range()) && interruptData.dangerLevel >= 3 && !target->get_is_cc_immune()) {
+					auto timeToHit = 0.5 + myhero->get_distance(target) / 400;	// this is not really accurate but it should work
+					if (interruptData.maxRemainingTime >= timeToHit) {
+						r->cast(target);
+						if (generalMenu::debug->get_bool()) myhero->print_chat(0, "Interrupt R on %s", InterruptDB::getDisplayName(target).c_str());
+					}
+					
 					
 				}
 
@@ -455,7 +462,7 @@ namespace nautilus {
 				colorMenu::rColor = colorMenu->add_colorpick("colorR", "R Range Color", rcolor);
 			}
 			spelldb = mainMenuTab->add_tab("interruptdb", "Interrupt Database");
-			Database::InitializeCancelMenu(spelldb);
+			InterruptDB::InitializeCancelMenu(spelldb);
 
 			mainMenuTab->add_separator("version", "Version: " + VERSION);
 			//init whitelists

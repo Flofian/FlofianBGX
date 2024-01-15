@@ -159,9 +159,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\interruptdb\Interrupt.cpp" />
     <ClCompile Include="..\plugin_sdk\clipper.cpp" />
     <ClCompile Include="..\plugin_sdk\plugin_sdk.cpp" />
-    <ClCompile Include="..\spelldb\SpellDB.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="malphite.cpp" />
     <ClCompile Include="nami.cpp" />
@@ -170,10 +170,10 @@
     <ClCompile Include="sona.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\interruptdb\Interrupt.h" />
     <ClInclude Include="..\plugin_sdk\clipper.h" />
     <ClInclude Include="..\plugin_sdk\cpplinq.h" />
     <ClInclude Include="..\plugin_sdk\plugin_sdk.hpp" />
-    <ClInclude Include="..\spelldb\SpellDB.h" />
     <ClInclude Include="malphite.h" />
     <ClInclude Include="nami.h" />
     <ClInclude Include="nautilus.h" />

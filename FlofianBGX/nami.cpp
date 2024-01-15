@@ -1,6 +1,6 @@
 #include "../plugin_sdk/plugin_sdk.hpp"
 #include "nami.h"
-#include "../spelldb/SpellDB.h"
+#include "../interruptdb/Interrupt.h"
 #include <inttypes.h>
 #include "permashow.hpp"
 
@@ -909,9 +909,9 @@ namespace nami {
 						auto castStartTime = activeSpell->cast_start_time();
 						auto castTime = activeSpell->get_spell_data()->mCastTime();
 						auto remainingTime = castStartTime - gametime->get_time() + castTime;
-						if (remainingTime > 0.8 && pred.hitchance >= hit_chance::low) {	// should be enough, not sure if there are any other than luxR and ezrealR Also maybe change to hitchance immobile
+						if (remainingTime > 0.8 && pred.hitchance >= hit_chance::low && !activeSpell->is_auto_attack()) {	// should be enough, not sure if there are any other than luxR and ezrealR Also maybe change to hitchance immobile
 							q->cast(pred.get_cast_position());
-							console->print("Cast Q on Special %s", target->get_model_cstr());
+							console->print("Cast Q on Special %s %s with %f s remaining", target->get_model_cstr(), activeSpell->get_spell_data()->get_name_cstr(), remainingTime);
 							return;
 						}
 					}
@@ -1066,25 +1066,27 @@ namespace nami {
 		if (qInterrupt || rInterrupt) {
 			for (const auto& target : entitylist->get_enemy_heroes()) {
 				if (target && target->is_valid() && target->is_visible() && !target->is_zombie() && target->is_valid_target(r->range()) && !target->get_is_cc_immune()) {
-					if(Database::getCastingImportance(target) >= 3 && rInterrupt)
+					auto interruptData = InterruptDB::getInterruptable(target);
+					if(interruptData.dangerLevel >= 3 && rInterrupt)
 					{
 						if (target->get_champion() == champion_id::Jhin || target->get_champion() == champion_id::Xerath || target->get_champion() == champion_id::Karthus) r->set_range(2750);
 						// ^ I do this because i want to cancel them far away aswell, really hated it when blahajaio tried to cancel katarina r 3 screens away
 						auto pred = r->get_prediction(target);
-						if(pred.hitchance >= hit_chance::low)
+						auto timeToHit = pred.get_unit_position().distance(myhero) / r->speed + r->delay;
+						if(pred.hitchance >= hit_chance::low && interruptData.maxRemainingTime>=timeToHit)
 						{
 							r->cast(target);
-							console->print("Interrupt R on %s", Database::getDisplayName(target).c_str());
+							console->print("Interrupt R on %s", InterruptDB::getDisplayName(target).c_str());
 						}
 						r->set_range(rMenu::range->get_int());
 					}
-					if (Database::getCastingImportance(target) >= 1 && qInterrupt)
+					if (interruptData.dangerLevel >= 1 && qInterrupt)
 					{
 						auto pred = q->get_prediction(target);
-						if (pred.hitchance >= hit_chance::low)
+						if (pred.hitchance >= hit_chance::low && interruptData.maxRemainingTime>=q->delay)
 						{
 							q->cast(target);
-							console->print("Interrupt Q on %s", Database::getDisplayName(target).c_str());
+							console->print("Interrupt Q on %s", InterruptDB::getDisplayName(target).c_str());
 						}
 					}
 
@@ -1431,7 +1433,7 @@ namespace nami {
 					uint32_t id = enemy->get_network_id();
 					bool defaultVal = true;
 					if (enemy->get_champion() == champion_id::Yasuo || enemy->get_champion() == champion_id::Nilah || enemy->get_champion() == champion_id::Samira || enemy->get_champion() == champion_id::Akali || enemy->get_champion() == champion_id::Kalista) defaultVal = false;
-					qDashWhitelist[id] = qMenu::dashWhitelist->add_checkbox(std::to_string(id), Database::getDisplayName(enemy), defaultVal, false);
+					qDashWhitelist[id] = qMenu::dashWhitelist->add_checkbox(std::to_string(id), InterruptDB::getDisplayName(enemy), defaultVal, false);
 					qDashWhitelist[id]->set_texture(enemy->get_square_icon_portrait());
 				}
 				qMenu->add_separator("sep2", "");
@@ -1460,7 +1462,7 @@ namespace nami {
 				wMenu::useOnLowHP->add_separator("sep1", "0 to disable");
 				for (const auto& ally : entitylist->get_ally_heroes()) {
 					uint32_t id = ally->get_network_id();
-					wLowHPList[id] = wMenu::useOnLowHP->add_slider(std::to_string(id), Database::getDisplayName(ally), 50 - 25 * (myhero->get_handle() == ally->get_handle()), 0, 100, false);
+					wLowHPList[id] = wMenu::useOnLowHP->add_slider(std::to_string(id), InterruptDB::getDisplayName(ally), 50 - 25 * (myhero->get_handle() == ally->get_handle()), 0, 100, false);
 					wLowHPList[id]->set_texture(ally->get_square_icon_portrait());
 				}
 				wMenu::wMana = wMenu->add_slider("wMana", "Min % Mana to auto W", 50, 0, 100);
@@ -1473,9 +1475,9 @@ namespace nami {
 				eMenu::useOn = eMenu->add_tab("useOn", "Use E on:");
 				for (const auto& ally : entitylist->get_ally_heroes()) {
 					auto name = ally->get_model_cstr();
-					auto tab = eMenu::useOn->add_tab(name, Database::getDisplayName(ally));
+					auto tab = eMenu::useOn->add_tab(name, InterruptDB::getDisplayName(ally));
 					tab->set_texture(ally->get_square_icon_portrait());
-					auto enable = tab->add_checkbox("enable", "Enable " + Database::getDisplayName(ally), true);
+					auto enable = tab->add_checkbox("enable", "Enable " + InterruptDB::getDisplayName(ally), true);
 					tab->add_separator("sep", "Spell Settings");
 					enable->set_texture(ally->get_square_icon_portrait());
 					tab->add_checkbox("AA", "Auto Attack", true);
@@ -1625,7 +1627,7 @@ namespace nami {
 				interruptMenu::useR = interruptMenu->add_checkbox("useR", "Use R for Importance >= 3", true);
 				interruptMenu::useR->set_texture(myhero->get_spell(spellslot::r)->get_icon_texture());
 				interruptMenu::spelldb = interruptMenu->add_tab("interruptdb", "Importance Settings");
-				Database::InitializeCancelMenu(interruptMenu::spelldb);
+				InterruptDB::InitializeCancelMenu(interruptMenu::spelldb);
 			}
 		}
 
