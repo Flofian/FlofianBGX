@@ -1,5 +1,6 @@
 #include "../plugin_sdk/plugin_sdk.hpp"
 #include "seraphine.h"
+#include "../interruptdb/Interrupt.h"
 
 namespace seraphine {
 	std::string VERSION = "1.0.0";
@@ -10,6 +11,7 @@ namespace seraphine {
 	script_spell* e = nullptr;
 	script_spell* e2 = nullptr;
 	script_spell* r = nullptr;
+	script_spell* rExtended = nullptr;
 	TreeTab* mainMenuTab = nullptr;
 
 	bool passiveReady = false;
@@ -18,6 +20,7 @@ namespace seraphine {
 	std::map<uint32_t, prediction_output> ePredictionList;
 	std::map<uint32_t, prediction_output> e2PredictionList;
 	std::map<uint32_t, prediction_output> rPredictionList;
+	std::map<uint32_t, prediction_output> rExtPredictionList;
 
 	namespace generalMenu {
 		TreeEntry* debug = nullptr;
@@ -38,12 +41,15 @@ namespace seraphine {
 		TreeEntry* semiKey = nullptr;
 		TreeEntry* semiTargets = nullptr;
 		TreeEntry* ignoreSemiHitcount = nullptr;
+		TreeTab* interruptMenu = nullptr;
+		TreeEntry* interrupt = nullptr;
 	}
 	namespace predMenu {
 		TreeEntry* q = nullptr;
 		TreeEntry* q2 = nullptr;
 		TreeEntry* e = nullptr;
 		TreeEntry* e2 = nullptr;
+		TreeEntry* eRange = nullptr;
 		TreeEntry* r = nullptr;
 		TreeEntry* allowRExtend = nullptr;
 	}
@@ -102,10 +108,14 @@ namespace seraphine {
 	int countRHits(const vector targetpos) {
 		int counter = 0;
 		vector endpos = myhero->get_position().extend(targetpos, r->range());
-		for (const game_object_script& enemy : entitylist->get_enemy_heroes()) {
+		auto enemylist = entitylist->get_enemy_heroes();
+		std::sort(enemylist.begin(), enemylist.end(), [](game_object_script a, game_object_script b) {
+			return myhero->get_distance(a) < myhero->get_distance(b);
+			});
+		for (const game_object_script& enemy : enemylist) {
 			if (enemy->is_dead() || enemy->is_zombie() || !enemy->is_visible() || enemy->get_is_cc_immune() || !enemy->is_targetable()) continue;
 			auto rect = geometry::rectangle(myhero->get_position(), endpos, 160.f + enemy->get_bounding_radius()).to_polygon();
-			auto pred = rPredictionList[enemy->get_handle()];
+			auto pred = rExtPredictionList[enemy->get_handle()];
 			if (rect.is_inside(pred.get_unit_position()) && pred.hitchance >= get_hitchance(predMenu::r->get_int())) {
 				counter++;
 				if (predMenu::allowRExtend->get_bool()) {
@@ -166,7 +176,7 @@ namespace seraphine {
 			for (const auto& ally : entitylist->get_ally_heroes()) {
 				if (ally->get_distance(myhero) < w->range()) {
 					// i could reduce how much is coming in during cast time but i doubt thats needed
-					float incoming = health_prediction->get_incoming_damage(ally, 2.5f + 0.5f * passiveReady, true);
+					float incoming = health_prediction->get_incoming_damage(ally, 2.5f + 0.5f * passiveReady, false);	// skillshots?
 					totalShield += fmin(incoming, baseShield);	// this means i only count how much i actually shield
 					if (isHeal) totalHeal += (ally->get_max_health() - ally->get_health()) * missingHealthHeal;
 				}
@@ -178,13 +188,13 @@ namespace seraphine {
 			}
 		}
 		int antimelee = wMenu::antimelee->get_int();
-		if (antimelee == 0) {
+		if (antimelee == 1) {
 			if (myhero->count_enemies_in_range(400)) {
 				w->cast();
 				console->print("Used W Anti Melee Self");
 			}
 		}
-		else if (antimelee == 1) {
+		else if (antimelee == 0) {
 			for (const auto& ally : entitylist->get_ally_heroes()) {
 				if (myhero->get_distance(ally) < w->range() && ally->count_enemies_in_range(400)) {
 					w->cast();
@@ -237,13 +247,58 @@ namespace seraphine {
 			if (orbwalker->combo_mode() && rMenu::comboTargets->get_int() > 0) minTargets = rMenu::comboTargets->get_int();
 			if (rMenu::semiKey->get_bool() && rMenu::semiTargets->get_int() < minTargets) minTargets = rMenu::semiTargets->get_int();
 			// this above just means the mintargets is either semitargets or combotargets, depending on what is active, or if nothing active its 999 which i cant reach
+			/*
 			for (const auto& target : entitylist->get_enemy_heroes()) {
 				int hitcount = countRHits(rPredictionList[target->get_handle()].get_cast_position());
 				if (hitcount >= minTargets) {
 					r->cast(rPredictionList[target->get_handle()].get_cast_position());
 					console->print("Used R on %i Targets", hitcount);
 				}
+			}*/
+			// this is just to get viable r cast positions, not really needed
+			vector bestRPos = vector();
+			int bestRHitcount = -1;
+			auto enemies = entitylist->get_enemy_heroes();
+			std::vector<std::vector<game_object_script>> subsets = {};
+			std::vector<game_object_script> current = {};
+			for (int i = 1; i < pow(2, enemies.size()); i++) {
+				current.clear();
+				for (int j = 0; j < enemies.size(); j++) {
+					const auto& target = enemies[j];
+					if ((i >> j) & 1) current.push_back(target);
+				}
+				subsets.push_back(current);
 			}
+			std::vector<vector> positions = {};
+			for (const auto& subset : subsets) {
+				positions.clear();
+				for (const auto& enemy : subset) {
+					positions.push_back(rExtPredictionList[enemy->get_handle()].get_unit_position());
+				}
+				mec_circle circle = mec::get_mec(positions);
+				int c = countRHits(circle.center);
+				if (c > bestRHitcount) {
+					bestRPos = circle.center;
+					bestRHitcount = c;
+				}
+			}
+			if (bestRHitcount >= minTargets) {
+				r->cast(bestRPos);
+				console->print("Used R on %i Targets", bestRHitcount);
+			}
+		}
+
+		// interrupt
+		for (const auto& enemy : entitylist->get_enemy_heroes()) {
+			if (!enemy || !enemy->is_valid() || enemy->get_is_cc_immune() || enemy->is_dead() || !enemy->is_targetable()) continue;
+			auto data = InterruptDB::getInterruptable(enemy);
+			auto pred = rPredictionList[enemy->get_handle()];
+			float travelTime = r->delay + pred.get_unit_position().distance(myhero) / r->speed;
+			if (data.dangerLevel && data.maxRemainingTime >= travelTime && pred.hitchance >= hit_chance::low) {
+				r->cast(pred.get_cast_position());
+				console->print("Used Interrupt R on %s", InterruptDB::getDisplayName(enemy).c_str());
+			}
+
 		}
 	}
 
@@ -300,7 +355,8 @@ namespace seraphine {
 			ePredictionList[enemy->get_handle()] = epred;
 			e2PredictionList[enemy->get_handle()] = e2pred;
 
-			rPredictionList[enemy->get_handle()] = r->get_prediction(enemy);	// doing this same way as my sona makes no sense since hitchance doesnt matter
+			rPredictionList[enemy->get_handle()] = r->get_prediction(enemy);// doing this same way as my sona makes no sense since hitchance doesnt matter
+			rExtPredictionList[enemy->get_handle()] = rExtended->get_prediction(enemy);	
 		}
 	}
 
@@ -322,10 +378,14 @@ namespace seraphine {
 			auto& q2bp = q2BloomPredictionList[enemy->get_handle()];
 			auto& ep = ePredictionList[enemy->get_handle()];
 			auto& e2p = e2PredictionList[enemy->get_handle()];
-			draw_manager->add_text_on_screen(vector(bar.x, bar.y - 90), MAKE_COLOR(255, 255, 255, 255), 15, "Q Bloom HC:   %s", hitchance_to_string(qbp.hitchance));
-			draw_manager->add_text_on_screen(vector(bar.x, bar.y - 70), MAKE_COLOR(255, 255, 255, 255), 15, "Q2 Bloom HC: %s", hitchance_to_string(q2bp.hitchance));
-			draw_manager->add_text_on_screen(vector(bar.x, bar.y - 50), MAKE_COLOR(255, 255, 255, 255), 15, "E HC:   %s", hitchance_to_string(ep.hitchance));
-			draw_manager->add_text_on_screen(vector(bar.x, bar.y - 30), MAKE_COLOR(255, 255, 255, 255), 15, "E2 HC: %s", hitchance_to_string(e2p.hitchance));
+			auto& rp = rPredictionList[enemy->get_handle()];
+			auto& r2p = rExtPredictionList[enemy->get_handle()];
+			draw_manager->add_text_on_screen(vector(bar.x, bar.y - 130), MAKE_COLOR(255, 255, 255, 255), 15, "Q Bloom HC:   %s", hitchance_to_string(qbp.hitchance));
+			draw_manager->add_text_on_screen(vector(bar.x, bar.y - 110), MAKE_COLOR(255, 255, 255, 255), 15, "Q2 Bloom HC: %s", hitchance_to_string(q2bp.hitchance));
+			draw_manager->add_text_on_screen(vector(bar.x, bar.y - 90), MAKE_COLOR(255, 255, 255, 255), 15, "E HC:   %s", hitchance_to_string(ep.hitchance));
+			draw_manager->add_text_on_screen(vector(bar.x, bar.y - 70), MAKE_COLOR(255, 255, 255, 255), 15, "E2 HC: %s", hitchance_to_string(e2p.hitchance));
+			draw_manager->add_text_on_screen(vector(bar.x, bar.y - 50), MAKE_COLOR(255, 255, 255, 255), 15, "R HC:   %s", hitchance_to_string(rp.hitchance));
+			draw_manager->add_text_on_screen(vector(bar.x, bar.y - 30), MAKE_COLOR(255, 255, 255, 255), 15, "RExt HC: %s", hitchance_to_string(r2p.hitchance));
 			/*
 			draw_manager->add_filled_circle(qbp.get_cast_position(), 15, MAKE_COLOR(0, 255, 0, 255));
 			draw_manager->add_filled_circle(q2bp.get_cast_position(), 10, MAKE_COLOR(255, 0, 0, 255));
@@ -367,11 +427,13 @@ namespace seraphine {
 		e = plugin_sdk->register_spell(spellslot::e, 1300);
 		e2 = plugin_sdk->register_spell(spellslot::e, 1300);
 		r = plugin_sdk->register_spell(spellslot::r, 1200);
+		rExtended = plugin_sdk->register_spell(spellslot::r, 2400);
 		q->set_skillshot(0.25, 350, 1200, { collisionable_objects::yasuo_wall }, skillshot_type::skillshot_circle);
 		qBloom->set_skillshot(0.25 + 0.4, 350, 1200, {}, skillshot_type::skillshot_circle);	// time it takes to bloom (i know this makes collision and stuff harder, check calcs function)
 		e->set_skillshot(0.25, 70, 1200, { collisionable_objects::yasuo_wall }, skillshot_type::skillshot_line);
 		e2->set_skillshot(0.5, 70, 1200, { collisionable_objects::yasuo_wall }, skillshot_type::skillshot_line);
 		r->set_skillshot(0.5, 160, 1600, { collisionable_objects::yasuo_wall }, skillshot_type::skillshot_line);
+		rExtended->set_skillshot(0.5, 160, 1600, { collisionable_objects::yasuo_wall }, skillshot_type::skillshot_line);
 
 		mainMenuTab = menu->create_tab("FlofianSeraphine", "Flofian Seraphine");
 		mainMenuTab->set_assigned_texture(myhero->get_square_icon_portrait());
@@ -407,6 +469,8 @@ namespace seraphine {
 				rMenu::semiTargets = rMenu->add_slider("SemiTargets", "Min Targets for Semi Key", 2, 1, 5);
 				rMenu::ignoreSemiHitcount = rMenu->add_checkbox("ignoreSemiHits", "Ignore Hitcount for Semi R if target selected", true);
 				rMenu::ignoreSemiHitcount->set_tooltip("If you click on someone to force that target (red circle under them), ignore how many it can hit");
+				rMenu::interruptMenu = rMenu->add_tab("interrupt", "Interrupt");
+				rMenu::interrupt = rMenu::interruptMenu->add_checkbox("useR", "Use R to interrupt", true);
 			}
 			auto predMenu = mainMenuTab->add_tab("pred", "Prediction Settings");
 			{
@@ -414,6 +478,11 @@ namespace seraphine {
 				predMenu::q2 = predMenu->add_combobox("q2Hitchance", "Q2 Hitchance", { {"Low", nullptr}, {"Medium", nullptr},{"High", nullptr},{"Very High", nullptr} }, 1);
 				predMenu::e = predMenu->add_combobox("e1Hitchance", "E1 Hitchance", { {"Low", nullptr},{"Medium", nullptr},{"High", nullptr},{"Very High", nullptr} }, 2);
 				predMenu::e2 = predMenu->add_combobox("e2Hitchance", "E2 Hitchance", { {"Low", nullptr}, {"Medium", nullptr},{"High", nullptr},{"Very High", nullptr} }, 1);
+				predMenu::eRange = predMenu->add_slider("eRange", "E Range", 1100, 1000, 1300);
+				predMenu::eRange->add_property_change_callback([](TreeEntry* entry) {
+					e->set_range(entry->get_int());
+					});
+				e->set_range(predMenu::eRange->get_int());
 				predMenu::r = predMenu->add_combobox("rHitchance", "R Hitchance", { {"Low", nullptr},{"Medium", nullptr},{"High", nullptr},{"Very High", nullptr} }, 3);
 				predMenu::allowRExtend = predMenu->add_checkbox("allowRExtend", "Include R Extending", true);
 			}
@@ -458,6 +527,7 @@ namespace seraphine {
 				colorMenu::rColor = colorMenu->add_colorpick("colorR", "R Range Color", rcolor);
 			}
 		}
+		InterruptDB::InitializeCancelMenu(rMenu::interruptMenu, true, 3);
 
 		event_handler<events::on_update>::add_callback(on_update);
 		event_handler<events::on_draw>::add_callback(on_draw);
