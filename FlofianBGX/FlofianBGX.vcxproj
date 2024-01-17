@@ -167,6 +167,7 @@
     <ClCompile Include="nami.cpp" />
     <ClCompile Include="nautilus.cpp" />
     <ClCompile Include="permashow.cpp" />
+    <ClCompile Include="seraphine.cpp" />
     <ClCompile Include="sona.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -178,6 +179,7 @@
     <ClInclude Include="nami.h" />
     <ClInclude Include="nautilus.h" />
     <ClInclude Include="permashow.hpp" />
+    <ClInclude Include="seraphine.h" />
     <ClInclude Include="sona.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
