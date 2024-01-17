@@ -1568,7 +1568,7 @@ namespace nami {
 				r->set_range(rMenu::range->get_int());// when loading
 				rMenu::hc = rMenu->add_combobox("Hitchance", "Hitchance", { {"Medium", nullptr},{"High", nullptr},{"Very High", nullptr} }, 2);
 				rMenu::comboTargets = rMenu->add_slider("comboTargets", "Min Targets in Combo (0 to disable)", 3, 0, 5);
-				rMenu::semiKey = rMenu->add_hotkey("semiKey", "Semi Key", TreeHotkeyMode::Hold, 5, true);
+				rMenu::semiKey = rMenu->add_hotkey("semiKey", "Semi Key", TreeHotkeyMode::Hold, 0x54, false);
 				rMenu::semiTargets = rMenu->add_slider("semiTargets", "Min Targets for Semi R (0 to disable)", 2, 0, 5);
 				rMenu::semiSelected = rMenu->add_checkbox("semiSelected", "Force Semi R on selected", true);
 				rMenu::semiSelected->set_tooltip("If you click on someone to force that target (red circle under them), ignore how many it can hit");

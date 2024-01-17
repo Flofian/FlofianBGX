@@ -581,7 +581,7 @@ namespace sona {
 				rMenu::useExperimentalPred = rMenu->add_checkbox("customPred", "Use custom Prediction", true);
 				rMenu::hitchance = rMenu->add_combobox("Hitchance", "Hitchance", { {"Medium", nullptr},{"High", nullptr},{"Very High", nullptr} }, 1);
 				rMenu::comboTargets = rMenu->add_slider("ComboTargets", "Min Targets in Combo (0 to disable)", 3, 0, 5);
-				rMenu::semiKey = rMenu->add_hotkey("SemiKey", "Semi Key", TreeHotkeyMode::Hold, 0x54, true);
+				rMenu::semiKey = rMenu->add_hotkey("SemiKey", "Semi Key", TreeHotkeyMode::Hold, 0x54, false);
 				rMenu::semiTargets = rMenu->add_slider("SemiTargets", "Min Targets for Semi Key", 2, 1, 5);
 				rMenu::useBoundingBox = rMenu->add_checkbox("useBoundingBox", "DEBUG Use bounding box", true);
 				rMenu::useBoundingBox->is_hidden() = true;		// hide for now
