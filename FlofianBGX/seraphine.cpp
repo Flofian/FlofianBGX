@@ -471,6 +471,7 @@ namespace seraphine {
 				rMenu::ignoreSemiHitcount->set_tooltip("If you click on someone to force that target (red circle under them), ignore how many it can hit");
 				rMenu::interruptMenu = rMenu->add_tab("interrupt", "Interrupt");
 				rMenu::interrupt = rMenu::interruptMenu->add_checkbox("useR", "Use R to interrupt", true);
+				rMenu::interruptMenu->add_separator("sep1", "");
 			}
 			auto predMenu = mainMenuTab->add_tab("pred", "Prediction Settings");
 			{
