@@ -22,6 +22,8 @@ Current Champions:
 
 - Nami
 
+- Seraphine
+
 Possible Future Champs: 
 
 - Bard
@@ -31,8 +33,6 @@ Possible Future Champs:
 - Leona
 
 - Ryze?
-
-- Seraphine
 
 - Zilean
 
