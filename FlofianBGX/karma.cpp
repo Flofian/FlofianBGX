@@ -71,31 +71,7 @@ namespace karma {
 	{
 		return static_cast<hit_chance>(hc + 4);
 	}
-	const char* hitchance_to_string(hit_chance hc) {
-		switch (hc)
-		{
-		case hit_chance::immobile:
-			return "8 - immobile";
-		case hit_chance::dashing:
-			return "7 - dashing";
-		case hit_chance::very_high:
-			return "6 - very high";
-		case hit_chance::high:
-			return "5 - high";
-		case hit_chance::medium:
-			return "4 - medium";
-		case hit_chance::low:
-			return "3 - low";
-		case hit_chance::impossible:
-			return "2 - not possible";
-		case hit_chance::out_of_range:
-			return "1 - out_of_range";
-		case hit_chance::collision:
-			return "0 - collision";
-		default:
-			return "?";
-		}
-	}
+	
 
 
 	std::vector<game_object_script> getQExplosionTargets(vector pos) {
@@ -283,9 +259,8 @@ namespace karma {
 		auto target = target_selector->get_target(w, damage_type::magical);
 		if (!target)  return;
 		bool checks = wChecks(target);
-		bool force = myhero->get_health_percent() <= rwMenu::useAlwaysBelow->get_bool();
-		bool useR = myhero->get_health_percent() <= rwMenu::useBelow->get_bool() || force;
-		if (modeCast && (checks || !wMenu::rangespeedchecks->get_bool() || force)) {
+		bool useR = myhero->get_health_percent() <= rwMenu::useBelow->get_int() ;
+		if (modeCast && (checks || !wMenu::rangespeedchecks->get_bool() || useR)) {
 			if (useR) r->cast();
 			w->cast(target);
 		}
@@ -483,7 +458,7 @@ namespace karma {
 		qColDummy->set_skillshot(0.25, 60, 1700, { collisionable_objects::minions, collisionable_objects::heroes }, skillshot_type::skillshot_line);
 		rqColDummy->set_skillshot(0.25, 80, 1700, { collisionable_objects::minions, collisionable_objects::heroes }, skillshot_type::skillshot_line);
 
-		mainMenuTab = menu->create_tab("FlofianTest", "Flofian Karma Test");
+		mainMenuTab = menu->create_tab("FlofianKarma", "Flofian Karma");
 		mainMenuTab->set_assigned_texture(myhero->get_square_icon_portrait());
 
 		{
@@ -491,6 +466,7 @@ namespace karma {
 			{
 				generalMenu::debug = generalMenu->add_checkbox("debug", "Debug", false);
 			}
+			generalMenu->is_hidden() = true;
 			auto qMenu = mainMenuTab->add_tab("q", "Q Settings");
 			{
 				qMenu->set_assigned_texture(myhero->get_spell(spellslot::q)->get_icon_texture_by_index(0));
