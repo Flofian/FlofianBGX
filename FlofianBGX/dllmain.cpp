@@ -4,10 +4,11 @@
 #include "malphite.h"
 #include "nami.h"
 #include "seraphine.h"
+#include "karma.h"
 
 PLUGIN_NAME( "Flofian" );
 PLUGIN_TYPE(plugin_type::champion);
-SUPPORTED_CHAMPIONS(champion_id::Sona, champion_id::Nautilus, champion_id::Malphite, champion_id::Nami, champion_id::Seraphine);
+SUPPORTED_CHAMPIONS(champion_id::Sona, champion_id::Nautilus, champion_id::Malphite, champion_id::Nami, champion_id::Seraphine, champion_id::Karma);
 
 PLUGIN_API bool on_sdk_load( plugin_sdk_core* plugin_sdk_good )
 {
@@ -28,6 +29,9 @@ PLUGIN_API bool on_sdk_load( plugin_sdk_core* plugin_sdk_good )
         break;
     case champion_id::Seraphine:
         seraphine::load();
+        break;
+    case champion_id::Karma:
+        karma::load();
         break;
     default:
         console->print("Champion %s is not supported!", myhero->get_model_cstr());
@@ -55,6 +59,9 @@ PLUGIN_API void on_sdk_unload( )
         break;
     case champion_id::Seraphine:
         seraphine::unload();
+        break;
+    case champion_id::Karma:
+        karma::unload();
         break;
     default:
         break;

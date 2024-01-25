@@ -40,6 +40,9 @@
     <ClCompile Include="seraphine.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="karma.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\plugin_sdk\cpplinq.h">
@@ -70,6 +73,9 @@
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="seraphine.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="karma.h">
       <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>
