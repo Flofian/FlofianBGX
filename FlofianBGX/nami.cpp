@@ -937,11 +937,11 @@ namespace nami {
 			// multi bounce logic
 			bool modeCast = (wMenu::mode->get_int() == 0 && orbwalker->harass()) || (wMenu::mode->get_int() <= 1 && orbwalker->combo_mode());
 			int modeMinTargets = wMenu::minTargets->get_int();
-			bool autoChecks = wMenu::autoWTripleHit->get_bool() && myhero->get_mana_percent() > wMenu::wMana->get_int() && !myhero->is_recalling();
+			bool autoChecks =  myhero->get_mana_percent() > wMenu::wMana->get_int() && !myhero->is_recalling();
 			for (const auto& ally : entitylist->get_ally_heroes()) {
 				if (ally->get_distance(myhero) > w->range()) continue;
 				int bt = countWBounces(ally);
-				if ((bt == 3 && autoChecks) || (modeCast && bt >= modeMinTargets)) w->cast(ally);
+				if ((wMenu::autoWTripleHit->get_bool() && bt == 3 && autoChecks) || (modeCast && bt >= modeMinTargets)) w->cast(ally);
 				
 			}
 			for (const auto& enemy : entitylist->get_enemy_heroes()) {
@@ -949,16 +949,18 @@ namespace nami {
 				int b = countWBounces(enemy);
 				//int minb = int(b / 10);
 				int maxb = b % 10;
-				if ((maxb == 3 && autoChecks) || (modeCast && maxb >= modeMinTargets)) w->cast(enemy);
+				if ((wMenu::autoWTripleHit->get_bool() && maxb == 3 && autoChecks) || (modeCast && maxb >= modeMinTargets)) w->cast(enemy);
 			}
 
 			// auto low hp
 			if(autoChecks)
 			{
+				game_object_script lowest = nullptr;
 				for (const auto& ally : entitylist->get_ally_heroes()) {
 					if (ally->get_distance(myhero) > w->range() || ally->is_dead() || !ally->is_targetable() || ally->is_recalling()) continue;
-					if (ally->get_health_percent() < wLowHPList[ally->get_network_id()]->get_int()) w->cast(ally);
+					if (ally->get_health_percent() < wLowHPList[ally->get_network_id()]->get_int() && (!lowest ||  ally->get_health_percent() < lowest->get_health_percent())) lowest = ally;
 				}
+				if (lowest) w->cast(lowest);
 			}
 		}
 		

@@ -22,17 +22,17 @@ Current Champions:
 
 - Nami
 
+- Seraphine
+
+- Karma
+
 Possible Future Champs: 
 
 - Bard
 
-- Karma
-
 - Leona
 
 - Ryze?
-
-- Seraphine
 
 - Zilean
 

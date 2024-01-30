@@ -128,6 +128,7 @@ namespace karma {
 			for (vector pos : positions) {
 				if (endPos.distance(pos) > qMenu::explosionSize->get_int()) return vector();	// filter out if i cant hit all?
 			}
+			if(q->get_collision(myhero->get_position(), {endPos}).size()  == 0 && qColDummy->get_collision(myhero->get_position(), { endPos }).size() == 0)
 			return circle.center;
 		}
 		return vector();
