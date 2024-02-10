@@ -291,6 +291,8 @@ namespace nami {
 		"DrMundoQ",
 		"DravenE",
 		"DravenR",
+		"EzrealQ",
+		"EzrealR",
 		"JhinR",
 		"JinxW",
 		"JinxR",
@@ -1219,6 +1221,39 @@ namespace nami {
 			}
 		}
 		
+		// do same shit here since some stuff is not active spell
+		int eMode = eMenu::mode->get_int();
+		if (e->is_ready() && !myhero->is_recalling() && (eMode == 0 || (eMode == 1 && orbwalker->harass()) || (eMode <= 2 && orbwalker->combo_mode()))) {
+			int overwrite = eMenu::overwrite->get_int();
+				// Do ally on active Spell
+			auto tab = eDB[sender->get_model_cstr()];
+			if (!tab || !tab->get_entry("enable")->get_bool() || sender->get_distance(myhero) > e->range()) return;
+
+			auto target = entitylist->get_object(spell->get_last_target_id());
+			bool isAuto = spell->is_auto_attack() && !sender->is_winding_up();
+			bool isTargeted = spell->get_spell_data()->get_targeting_type() == spell_targeting::target || isAuto;
+			bool isTargetingEnemy = target && target->is_valid() && target->is_enemy() && target->is_ai_hero();
+			//if (isAuto && target && generalMenu::debug->get_bool()) console->print("%s Autoattack on %s, is enemy: %i",ally->get_model_cstr(), target->get_model_cstr(), isTargetingEnemy);
+			std::string spellName = spellSlotName(spell);
+			if (spellName == "") return; // Unsupported Spell, items, idk
+			bool isSupported = supportedSpells.find(sender->get_model_cstr() + spellName) != supportedSpells.end();
+			bool isEnabled = isSupported ? tab->get_entry(spellName)->get_int() == 2 : tab->get_entry(spellName)->get_bool();
+			// this can be compressed, but i keep it like this for clarity
+			bool useE = (overwrite == 0 && isEnabled && ((!isTargeted && !isAuto) || isTargetingEnemy)) ||
+				(overwrite == 1 && isTargeted && isTargetingEnemy && isEnabled) ||
+				(overwrite == 2 && isAuto && isEnabled) ||
+				(overwrite == 3 && isTargeted && isTargetingEnemy) ||
+				(overwrite == 4 && isAuto);
+
+			if (useE) {
+				e->cast(sender);
+				console->print("%f: %s %s, TargetsEnemy: %i, AA: %i, Enabled: %i, Use E: %i", gametime->get_time(), sender->get_model_cstr(), spellSlotName(spell).c_str(), isTargeted, isAuto, isEnabled, useE);
+				return;
+
+			}
+				
+			
+		}
 	}
 	void on_create_object(game_object_script obj)
 	{
@@ -1394,6 +1429,9 @@ namespace nami {
 			console->print("Set DeathAnimTime to %f on %s", gametime->get_time(), sender->get_model_cstr());
 		}
 	}
+	const char* boolToText(bool b) {
+		return b ? "True" : "False";
+	}
 
 	void load() {
 		q = plugin_sdk->register_spell(spellslot::q, 850);
@@ -1484,10 +1522,15 @@ namespace nami {
 					enable->set_texture(ally->get_square_icon_portrait());
 					tab->add_checkbox("AA", "Auto Attack", true);
 					// If i get my sdk access removed for this i deserved it
-					auto qDropdown = supportedSpells.find(name + std::string("Q")) != supportedSpells.end();
-					auto wDropdown = supportedSpells.find(name + std::string("W")) != supportedSpells.end();
-					auto eDropdown = supportedSpells.find(name + std::string("E")) != supportedSpells.end();
-					auto rDropdown = supportedSpells.find(name + std::string("R")) != supportedSpells.end();
+					bool qDropdown = supportedSpells.find(name + std::string("Q")) != supportedSpells.end();
+					bool wDropdown = supportedSpells.find(name + std::string("W")) != supportedSpells.end();
+					bool eDropdown = supportedSpells.find(name + std::string("E")) != supportedSpells.end();
+					bool rDropdown = supportedSpells.find(name + std::string("R")) != supportedSpells.end();
+					/*console->print("Menu: %s: %s, %s: %s, %s: %s, %s: %s",
+						(name + std::string("Q")).c_str(), boolToText(qDropdown), 
+						(name + std::string("W")).c_str(), boolToText(wDropdown), 
+						(name + std::string("E")).c_str(), boolToText(eDropdown), 
+						(name + std::string("R")).c_str(), boolToText(rDropdown));*/
 					TreeEntry* qt;
 					TreeEntry* wt;
 					TreeEntry* et;
