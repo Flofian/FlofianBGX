@@ -1,5 +1,3 @@
-Join my [Discord](https://discord.gg/dURC8dsFUr) for announcements
-
 Interrupt Database based on Omori SpellDB
 
 [GitHub - BGXBreaker/BGXAddons](https://github.com/BGXBreaker/BGXAddons)
